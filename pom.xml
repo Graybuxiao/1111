@@ -20,7 +20,7 @@
     <swagger-model.version>1.6.6</swagger-model.version>
     <swagger-ui.version>1.9.6</swagger-ui.version>
     <!-- 数据库配置 -->
-    <druid.version>1.2.9</druid.version>
+    <druid.version>1.2.8</druid.version>
     <mybatis-plus.vesion>3.5.1</mybatis-plus.vesion>
     <mybatis-plus.generator.vesion>3.4.1</mybatis-plus.generator.vesion>
     <mybatis-plus.dynamic.vesion>3.5.1</mybatis-plus.dynamic.vesion>
@@ -30,6 +30,7 @@
     <postgre.version>42.2.23</postgre.version>
     <sqlserver.version>4.0</sqlserver.version>
     <oracle.version>21.5.0.0</oracle.version>
+    <dm8.version>8.1.1.49</dm8.version>
     <!-- 其他 -->
     <jna.version>5.11.0</jna.version>
     <commons-io.version>2.11.0</commons-io.version>
@@ -122,6 +123,12 @@
         <groupId>com.alibaba</groupId>
         <artifactId>druid</artifactId>
         <version>${druid.version}</version>
+      </dependency>
+      <!--dm8-->
+      <dependency>
+        <groupId>com.dameng</groupId>
+        <artifactId>Dm8JdbcDriver18</artifactId>
+        <version>${dm8.version}</version>
       </dependency>
 
       <!-- mybatisplus -->
@@ -345,11 +352,10 @@
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpmime</artifactId>
     </dependency>
-    <!-- mysql -->
+    <!-- dm8 -->
     <dependency>
-      <groupId>mysql</groupId>
-      <artifactId>mysql-connector-java</artifactId>
-      <version>${mysql.version}</version>
+      <groupId>com.dameng</groupId>
+      <artifactId>Dm8JdbcDriver18</artifactId>
     </dependency>
     <dependency>
       <groupId>commons-fileupload</groupId>
