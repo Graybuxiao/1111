@@ -8,10 +8,10 @@ server:
 spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PWD:123456}
-    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DB:dingding_mid}?characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=GMT%2B8&allowMultiQueries=true&allowPublicKeyRetrieval=true&queryTimeout=2400&nullCatalogMeansCurrent=true
+    driver-class-name: dm.jdbc.driver.DmDriver
+    url: jdbc:dm://localhost:5236
+    username: root
+    password: root
   #===================== Redis配置 =====================
   redis:
     database: 1 #缓存库编号
@@ -67,6 +67,8 @@ flowable:
     enabled: false
   eventregistry:
     enabled: false
+  # 指定达梦schema
+  database-schema: TEST02
 
 config:
   minio:
