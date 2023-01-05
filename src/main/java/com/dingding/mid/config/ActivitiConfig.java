@@ -77,6 +77,8 @@ public class ActivitiConfig {
 		List<JobHandler> customJobHandlers =new ArrayList<>();
 		customJobHandlers.add(new CustomJobHandler());
 		config.setCustomJobHandlers(customJobHandlers);
+
+		config.setDatabaseSchema("SYSDBA");
 		return config;
 	}
 

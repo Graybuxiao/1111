@@ -9,9 +9,9 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: dm.jdbc.driver.DmDriver
-    url: jdbc:dm://localhost:5236
-    username: root
-    password: root
+    url: jdbc:dm://111.206.173.106:5238
+    username: SYSDBA
+    password: SYSDBA
   #===================== Redis配置 =====================
   redis:
     database: 1 #缓存库编号
@@ -68,7 +68,7 @@ flowable:
   eventregistry:
     enabled: false
   # 指定达梦schema
-  database-schema: TEST02
+  database-schema: lcdp
 
 config:
   minio:
