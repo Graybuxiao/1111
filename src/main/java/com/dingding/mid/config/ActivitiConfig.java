@@ -58,8 +58,8 @@ public class ActivitiConfig {
 		config.setDataSource(dataSource);
 		config.setTransactionManager(transactionManager);
 		config.setDisableIdmEngine(true);
-		config.setDatabaseType(AbstractEngineConfiguration.DATABASE_TYPE_ORACLE);
-		config.setDatabaseSchemaUpdate(ProcessEngineConfiguration.DB_SCHEMA_UPDATE_TRUE);
+		config.setDatabaseType(AbstractEngineConfiguration.DATABASE_TYPE_DM);
+		config.setDatabaseSchemaUpdate(ProcessEngineConfiguration.DB_SCHEMA_UPDATE_FALSE);
 		config.setDelegateExpressionFieldInjectionMode(DelegateExpressionFieldInjectionMode.MIXED);
 		config.setIdGenerator(idWorkerIdGenerator);
 		HttpClientConfig httpClientConfig=new HttpClientConfig();
@@ -78,7 +78,7 @@ public class ActivitiConfig {
 		customJobHandlers.add(new CustomJobHandler());
 		config.setCustomJobHandlers(customJobHandlers);
 
-		config.setDatabaseSchema("SYSDBA");
+//		config.setDatabaseSchema("SYSDBA");
 		return config;
 	}
 
