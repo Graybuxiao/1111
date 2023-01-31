@@ -70,6 +70,9 @@ public class SettingServiceImpl implements SettingService {
     @Resource
     private RepositoryService repositoryService;
 
+    @Autowired
+    private TemplateGroupMapper templateGroupMapper;
+
     /**
      * 查询表单组
      *
@@ -77,9 +80,14 @@ public class SettingServiceImpl implements SettingService {
      */
     @Override
     public Object getFormGroups(String token, String name) {
-      TemplateGroupMapper templateGroupMapper = SpringContextHolder.getBean(TemplateGroupMapper.class);
-      List<TemplateGroupBo> allformAndGroups = templateGroupMapper.getAllFormAndGroups();
+     // TemplateGroupMapper templateGroupMapper = SpringContextHolder.getBean(TemplateGroupMapper.class);
+
+        // 所有的表单数据（包含分组信息）
+        List<TemplateGroupBo> allformAndGroups = templateGroupMapper.getAllFormAndGroups();
+
         Map<Integer, List<TemplateGroupBo>> coverMap = new LinkedHashMap<>();
+
+        // 表单按照分组分类
         allformAndGroups.forEach(fg -> {
             List<TemplateGroupBo> bos = coverMap.get(fg.getGroupId());
             if (CollectionUtil.isEmpty(bos)) {
@@ -90,6 +98,8 @@ public class SettingServiceImpl implements SettingService {
                 bos.add(fg);
             }
         });
+
+        // 转换数据格式
         List<TemplateGroupVo> results = new ArrayList<>();
         coverMap.forEach((key, val) -> {
             List<TemplateGroupVo.Template> templates = new ArrayList<>();
@@ -109,7 +119,12 @@ public class SettingServiceImpl implements SettingService {
                             .build());
                 }
             });
-            results.add(TemplateGroupVo.builder().id(key).name(val.get(0).getGroupName()).items(templates).build());
+            results.add(TemplateGroupVo.builder()
+                    .id(key)
+                    .name(val.get(0).getGroupName())
+                    .items(templates)
+                    .build()
+            );
         });
         return R.ok(results);
     }
@@ -235,19 +250,17 @@ public class SettingServiceImpl implements SettingService {
     public Object updateForm(String templateId, String type, Integer groupId) {
         boolean isStop = "stop".equals(type);
 
-
-
       ProcessTemplates build = ProcessTemplates.builder().templateId(templateId).isStop(isStop)
           .build();
-      if ("using".equals(type) || isStop) {
-            processTemplateService.updateById(
-                ProcessTemplates.builder().templateId(templateId).isStop(isStop).build());
+      if ("using".equals(type) || isStop) { // 更新或停用
+            processTemplateService.updateById(ProcessTemplates.builder().templateId(templateId).isStop(isStop).build());
+
             LambdaUpdateWrapper<TemplateGroup> lambdaUpdateWrapper=new LambdaUpdateWrapper<>();
             lambdaUpdateWrapper.eq(TemplateGroup::getTemplateId,templateId);
-            lambdaUpdateWrapper.set(TemplateGroup::getGroupId,isStop ? 0 :1 );
+            lambdaUpdateWrapper.set(TemplateGroup::getGroupId,isStop ? 0 :1 ); // 停用的话，将模板-分组关联表中的分组id置0
             templateGroupService
                 .update(lambdaUpdateWrapper);
-        } else if ("delete".equals(type)) {
+        } else if ("delete".equals(type)) { // 删除
             processTemplateService.removeById(templateId);
             LambdaQueryWrapper<TemplateGroup> lambdaQueryWrapper=new LambdaQueryWrapper<>();
             lambdaQueryWrapper.eq(TemplateGroup::getTemplateId,templateId);
@@ -276,6 +289,7 @@ public class SettingServiceImpl implements SettingService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Object updateFormDetail(ProcessTemplates template) {
+        // 1. 更新数据库信息
         SettingsInfo settingsInfo = JSONObject.parseObject(template.getSettings(), new TypeReference<SettingsInfo>() {});
         ProcessTemplates processTemplates = processTemplateService.getById(template.getFormId());
         processTemplates.setTemplateName(template.getFormName());
@@ -298,8 +312,12 @@ public class SettingServiceImpl implements SettingService {
         JSONObject jsonObject=new JSONObject();
         jsonObject.put("processJson",template.getProcess());
         jsonObject.put("formJson",template.getFormItems());
+
+        // 2. 生成bpmn模型
         BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, template.getRemark(),
             template.getFormName(), template.getGroupId(), template.getFormId());
+
+        // 3. 部署模型
         repositoryService.createDeployment()
             .addBpmnModel(template.getFormName() + ".bpmn", bpmnModel)
             .name(template.getFormName())
@@ -309,7 +327,8 @@ public class SettingServiceImpl implements SettingService {
     }
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public void jsonToBpmn(FlowEngineDTO flowEngineDTO) throws InvocationTargetException, IllegalAccessException {
+    public void jsonToBpmn(FlowEngineDTO flowEngineDTO){
+
         String processJson = flowEngineDTO.getProcess();
         ChildNode childNode = JSONObject.parseObject(processJson, new TypeReference<ChildNode>(){});
         String settingsJson = flowEngineDTO.getSettings();
@@ -341,6 +360,7 @@ public class SettingServiceImpl implements SettingService {
         processTemplates.setCreated(date);
         processTemplates.setUpdated(date);
         processTemplateService.save(processTemplates);
+
         TemplateGroup templateGroup=new TemplateGroup();
         templateGroup.setTemplateId(processTemplates.getTemplateId());
         templateGroup.setGroupId(groupId);
@@ -353,17 +373,25 @@ public class SettingServiceImpl implements SettingService {
         jsonObject.put("formJson", formItems);
         BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, remark, formName, groupId,
             templateId);
+
         repositoryService.createDeployment()
             .addBpmnModel(formName + ".bpmn", bpmnModel)
             .name(formName)
             .category(groupId + "")
             .deploy();
-
-
     }
 
-    private BpmnModel assemBpmnModel(JSONObject jsonObject, ChildNode childNode, String remark,
-        String formName, Integer groupId, String templateId)
+    /**
+     * 生成Bpmn模型
+     * @param jsonObject
+     * @param childNode
+     * @param remark
+     * @param formName
+     * @param groupId
+     * @param templateId
+     * @return
+     */
+    private BpmnModel assemBpmnModel(JSONObject jsonObject, ChildNode childNode, String remark, String formName, Integer groupId, String templateId)
         {
         BpmnModel bpmnModel =new BpmnModel();
         List<SequenceFlow> sequenceFlows = Lists.newArrayList();
@@ -380,20 +408,25 @@ public class SettingServiceImpl implements SettingService {
         process.addAttribute(extensionAttribute);
         bpmnModel.addProcess(process);
 
+        // 启动节点
         StartEvent startEvent = createStartEvent();
         process.addFlowElement(startEvent);
-            String lastNode = null;
-            try {
-                lastNode = create(startEvent.getId(), childNode,process,bpmnModel,sequenceFlows,childNodeMap);
-            } catch (InvocationTargetException e) {
-                e.printStackTrace();
-                throw new WorkFlowException("操作失败");
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-                throw new WorkFlowException("操作失败");
-            }
-            EndEvent endEvent = createEndEvent();
+
+
+        String lastNode = null;
+        try {
+            lastNode = create(startEvent.getId(), childNode,process,bpmnModel,sequenceFlows,childNodeMap);
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+            throw new WorkFlowException("操作失败");
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+            throw new WorkFlowException("操作失败");
+        }
+        // 结束节点
+        EndEvent endEvent = createEndEvent();
         process.addFlowElement(endEvent);
+
         process.addFlowElement(connect(lastNode, endEvent.getId(),sequenceFlows,childNodeMap,process));
         List<FlowableListener> executionListeners =new ArrayList<>();
         FlowableListener flowableListener=new FlowableListener();

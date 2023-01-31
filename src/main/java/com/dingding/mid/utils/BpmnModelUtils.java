@@ -246,11 +246,11 @@ public class BpmnModelUtils {
 
     public static String create(String fromId, ChildNode flowNode, Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
         String nodeType = flowNode.getType();
-        if (Type.CONCURRENTS.isEqual(nodeType)) {
+        if (Type.CONCURRENTS.isEqual(nodeType)) { // 并行网关
             return createParallelGatewayBuilder(fromId, flowNode,process,bpmnModel,sequenceFlows,childNodeMap);
-        } else if (Type.CONDITIONS.isEqual(nodeType)) {
+        } else if (Type.CONDITIONS.isEqual(nodeType)) { // 排他网关
             return createExclusiveGatewayBuilder(fromId, flowNode,process,bpmnModel,sequenceFlows,childNodeMap);
-        } else if (Type.USER_TASK.isEqual(nodeType)) {
+        } else if (Type.USER_TASK.isEqual(nodeType)) { // 用户网关
             childNodeMap.put(flowNode.getId(),flowNode);
             JSONObject incoming = flowNode.getIncoming();
             incoming.put("incoming", Collections.singletonList(fromId));
@@ -262,8 +262,7 @@ public class BpmnModelUtils {
             } else {
                 return id;
             }
-        }
-        else if(Type.ROOT.isEqual(nodeType)){
+        } else if(Type.ROOT.isEqual(nodeType)){ // 根网关
             childNodeMap.put(flowNode.getId(),flowNode);
             JSONObject incoming = flowNode.getIncoming();
             incoming.put("incoming", Collections.singletonList(fromId));
@@ -275,8 +274,7 @@ public class BpmnModelUtils {
             } else {
                 return id;
             }
-        }
-        else if(Type.DELAY.isEqual(nodeType)){
+        } else if(Type.DELAY.isEqual(nodeType)){
             throw new WorkFlowException("还不想写这个功能");
 //            childNodeMap.put(flowNode.getId(),flowNode);
 //            JSONObject incoming = flowNode.getIncoming();

@@ -65,6 +65,7 @@
     <minio.version>8.4.0</minio.version>
     <yozosign.version>3.0.1</yozosign.version>
     <flowable.version>6.7.2</flowable.version>
+
   </properties>
 
   <dependencyManagement>

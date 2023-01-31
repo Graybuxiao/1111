@@ -42,9 +42,14 @@ public class OrgUserAndDeptServiceImpl implements OrgUserAndDeptService {
     @Override
     public Object getOrgTreeData(Integer deptId, String type) {
         LambdaQueryWrapper<Users> lambdaQueryWrapper=new LambdaQueryWrapper<>();
+
+        // 查找部门下的人和子部门（点击部门后展开时）
         if (!ObjectUtils.isEmpty(deptId)) {
+            // 部门搜索（id==0时查询的是最顶层的部门）
             LambdaQueryWrapper<Departments> departmentsLambdaQueryWrapper=new LambdaQueryWrapper<>();
             departmentsLambdaQueryWrapper.eq(Departments::getParentId, deptId);
+
+            // 用户查询
             lambdaQueryWrapper.like(Users::getDepartmentIds,"%"+deptId+"%")
                 .or()
                 .like(Users::getDepartmentIds,"%" + deptId + ",%")
@@ -73,13 +78,15 @@ public class OrgUserAndDeptServiceImpl implements OrgUserAndDeptService {
             });
             return R.ok(orgTreeVos);
         }
-        
+
+        // 下面貌似是废的代码？
         List<Users> users = userService.list();
         List<Departments> departments = departmentsService.list();
         //将人员按部门归类分组
         Map<Long, List<Users>> deptUsers = new HashMap<>();
+
         users.forEach(user -> {
-            for (String did : user.getDepartmentIds().split(",")) {
+            for (String did : user.getDepartmentIds().split(",")) { // 用户所在部门
                 List<Users> usersList = deptUsers.get(Long.parseLong(did));
                 if (null == usersList) {
                     List<Users> list = new ArrayList<>();

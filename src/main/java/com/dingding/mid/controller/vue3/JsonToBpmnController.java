@@ -84,13 +84,18 @@ public class JsonToBpmnController {
     @PostMapping("/jsonToBpmn")
     public Object saveForm(@RequestBody JSONObject jsonObject) throws InvocationTargetException, IllegalAccessException {
         System.err.println(jsonObject.toJSONString());
+        // 封装BpmnModel
         BpmnModel bpmnModel =new BpmnModel();
         Process process=new Process();
         bpmnModel.addProcess(process);
         List<SequenceFlow> sequenceFlows = Lists.newArrayList();
+
         process.setId("flowableV2_"+idWorker.nextId());
+
+        // 开始节点
         StartEvent startEvent = BpmnModelUtils.createStartEvent();
         process.addFlowElement(startEvent);
+
         JSONObject workFlowObj = jsonObject.getJSONObject("_value");
         String name = workFlowObj.getJSONObject("workFlowDef").getString("name");
         process.setName(name);
@@ -109,6 +114,12 @@ public class JsonToBpmnController {
         new BpmnAutoLayout(bpmnModel).execute();
         System.err.println(new String(new BpmnXMLConverter().convertToXML(bpmnModel)));
 
+        RepositoryService repositoryService = SpringContextHolder.getBean(RepositoryService.class);
+        repositoryService.createDeployment()
+                .addBpmnModel("测试.bpmn",bpmnModel)
+                .name("测试")
+                .category("测试分类")
+                .deploy();
 
         return R.ok("保存成功");
     }
@@ -380,6 +391,8 @@ public class JsonToBpmnController {
         if (incoming != null && !incoming.isEmpty()) {
             ServiceTask serviceTask = new ServiceTask();
             serviceTask.setName(flowNode.getString("nodeName"));
+            serviceTask.setImplementation("com.dingding.mid.listener.Vue3Listener");
+            serviceTask.setImplementationType("class");
             serviceTask.setId(id);
             process.addFlowElement(serviceTask);
             process.addFlowElement(connect(incoming.get(0), id,sequenceFlows));

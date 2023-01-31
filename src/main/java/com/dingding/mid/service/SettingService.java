@@ -71,6 +71,11 @@ public interface SettingService {
      */
     Object updateFormDetail(ProcessTemplates template);
 
-
-    void jsonToBpmn(FlowEngineDTO flowEngineDTO) throws InvocationTargetException, IllegalAccessException;
+    /**
+     * Json文件转Bpmn模型
+     * @param flowEngineDTO
+     * @throws InvocationTargetException
+     * @throws IllegalAccessException
+     */
+    void jsonToBpmn(FlowEngineDTO flowEngineDTO);
 }
