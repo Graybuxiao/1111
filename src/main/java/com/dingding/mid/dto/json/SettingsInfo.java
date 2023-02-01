@@ -11,8 +11,20 @@ import lombok.Data;
  */
 @Data
 public class SettingsInfo {
+  /**
+   * ？？？
+   */
   private List<String> commiter;
+  /**
+   * 谁可以管理
+   */
   private List<UserInfo> admin;
+  /**
+   * 同意时签字
+   */
   private Boolean sign;
+  /**
+   * 推送配置
+   */
   private JSONObject notify;
 }

@@ -35,16 +35,35 @@ import static org.flowable.bpmn.model.ImplementationType.IMPLEMENTATION_TYPE_DEL
  */
 public class BpmnModelUtils {
 
+    /**
+     * 根据前缀生成唯一UUID
+     * @param prefix    前缀
+     * @return  prefix_xxxx
+     */
     private static String id(String prefix) {
         return prefix + "_" + UUID.randomUUID().toString().replace("-", "").toLowerCase();
     }
 
+    /**
+     * 根据名称创建ServiceTask
+     * @param name 任务名称
+     * @return
+     */
     private static ServiceTask serviceTask(String name) {
         ServiceTask serviceTask = new ServiceTask();
         serviceTask.setName(name);
         return serviceTask;
     }
 
+    /**
+     * 节点连线
+     * @param from 从
+     * @param to    到
+     * @param sequenceFlows 连线列表
+     * @param childNodeMap
+     * @param process
+     * @return
+     */
     public static SequenceFlow connect(String from, String to,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap,Process process) {
         SequenceFlow flow = new SequenceFlow();
         String  sequenceFlowId = id("sequenceFlow");
@@ -229,7 +248,10 @@ public class BpmnModelUtils {
         return null;
     }
 
-
+    /**
+     * 创建开始节点
+     * @return
+     */
     public static StartEvent createStartEvent() {
         StartEvent startEvent = new StartEvent();
         startEvent.setId(START_EVENT_ID);
@@ -237,6 +259,10 @@ public class BpmnModelUtils {
         return startEvent;
     }
 
+    /**
+     * 创建结束节点
+     * @return
+     */
     public static EndEvent createEndEvent() {
         EndEvent endEvent = new EndEvent();
         endEvent.setId(END_EVENT_ID);
@@ -252,12 +278,14 @@ public class BpmnModelUtils {
             return createExclusiveGatewayBuilder(fromId, flowNode,process,bpmnModel,sequenceFlows,childNodeMap);
         } else if (Type.USER_TASK.isEqual(nodeType)) { // 用户网关
             childNodeMap.put(flowNode.getId(),flowNode);
+
             JSONObject incoming = flowNode.getIncoming();
             incoming.put("incoming", Collections.singletonList(fromId));
+
             String id = createTask(process,flowNode,sequenceFlows,childNodeMap);
             // 如果当前任务还有后续任务，则遍历创建后续任务
             ChildNode children = flowNode.getChildren();
-            if (Objects.nonNull(children) &&StringUtils.isNotBlank(children.getId())) {
+            if (Objects.nonNull(children) &&StringUtils.isNotBlank(children.getId())) { // 有子项，递归创建
                 return create(id, children,process,bpmnModel,sequenceFlows,childNodeMap);
             } else {
                 return id;
@@ -269,12 +297,12 @@ public class BpmnModelUtils {
             String id = createTask(process,flowNode,sequenceFlows,childNodeMap);
             // 如果当前任务还有后续任务，则遍历创建后续任务
             ChildNode children = flowNode.getChildren();
-            if (Objects.nonNull(children) &&StringUtils.isNotBlank(children.getId())) {
+            if (Objects.nonNull(children) &&StringUtils.isNotBlank(children.getId())) { // 有子项，递归创建
                 return create(id, children,process,bpmnModel,sequenceFlows,childNodeMap);
             } else {
                 return id;
             }
-        } else if(Type.DELAY.isEqual(nodeType)){
+        } else if(Type.DELAY.isEqual(nodeType)){ // 延时
             throw new WorkFlowException("还不想写这个功能");
 //            childNodeMap.put(flowNode.getId(),flowNode);
 //            JSONObject incoming = flowNode.getIncoming();
@@ -288,7 +316,7 @@ public class BpmnModelUtils {
 //                return id;
 //            }
         }
-        else if(Type.TRIGGER.isEqual(nodeType)){
+        else if(Type.TRIGGER.isEqual(nodeType)){ // 定时
             throw new WorkFlowException("还不想写这个功能");
         }
         else if(Type.CC.isEqual(nodeType)){
@@ -464,17 +492,32 @@ public class BpmnModelUtils {
         return parallelGateway;
     }
 
+    /**
+     * 创建并行网关
+     * @param formId
+     * @param flowNode
+     * @param process
+     * @param bpmnModel
+     * @param sequenceFlows
+     * @param childNodeMap
+     * @return
+     * @throws InvocationTargetException
+     * @throws IllegalAccessException
+     */
     private static String createParallelGatewayBuilder(String formId, ChildNode flowNode,Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
         childNodeMap.put(flowNode.getId(),flowNode);
         String name = flowNode.getName();
-        ParallelGateway parallelGateway = new ParallelGateway();
         String parallelGatewayId = flowNode.getId();
+
+        // 并行网关
+        ParallelGateway parallelGateway = new ParallelGateway();
         parallelGateway.setId(parallelGatewayId);
         parallelGateway.setName(name);
-        process.addFlowElement(parallelGateway);
-        process.addFlowElement(connect(formId, parallelGatewayId,sequenceFlows,childNodeMap,process));
 
-        if (Objects.isNull(flowNode.getBranchs()) && Objects.isNull(flowNode.getChildren())) {
+        process.addFlowElement(parallelGateway); // 新增并行网关
+        process.addFlowElement(connect(formId, parallelGatewayId,sequenceFlows,childNodeMap,process)); // 新增连线
+
+        if (Objects.isNull(flowNode.getBranchs()) && Objects.isNull(flowNode.getChildren())) { // 没有分支/子项：返回并行网关ID
             return parallelGatewayId;
         }
 
@@ -581,8 +624,8 @@ public class BpmnModelUtils {
         List<String> incoming = incomingJson.getJSONArray("incoming").toJavaList(String.class);
         // 自动生成id
 //        String id = id("serviceTask");
-        String id=flowNode.getId();
-        if (incoming != null && !incoming.isEmpty()) {
+        String id=flowNode.getId(); // 当前节点
+        if (incoming != null && !incoming.isEmpty()) { // 上游节点
             UserTask userTask = new UserTask();
             userTask.setName(flowNode.getName());
             userTask.setId(id);
@@ -600,6 +643,7 @@ public class BpmnModelUtils {
             taskListeners.add(taskListener);
             userTask.setTaskListeners(taskListeners);
             if("root".equalsIgnoreCase(id)){
+                return id;
             }
             else{
                 ArrayList<FlowableListener> listeners = new ArrayList<>();

@@ -258,8 +258,7 @@ public class SettingServiceImpl implements SettingService {
             LambdaUpdateWrapper<TemplateGroup> lambdaUpdateWrapper=new LambdaUpdateWrapper<>();
             lambdaUpdateWrapper.eq(TemplateGroup::getTemplateId,templateId);
             lambdaUpdateWrapper.set(TemplateGroup::getGroupId,isStop ? 0 :1 ); // 停用的话，将模板-分组关联表中的分组id置0
-            templateGroupService
-                .update(lambdaUpdateWrapper);
+            templateGroupService.update(lambdaUpdateWrapper);
         } else if ("delete".equals(type)) { // 删除
             processTemplateService.removeById(templateId);
             LambdaQueryWrapper<TemplateGroup> lambdaQueryWrapper=new LambdaQueryWrapper<>();
@@ -329,8 +328,10 @@ public class SettingServiceImpl implements SettingService {
     @Override
     public void jsonToBpmn(FlowEngineDTO flowEngineDTO){
 
+        // 1. 将JSON字符串转为Bpmn的ChildNode结构
         String processJson = flowEngineDTO.getProcess();
         ChildNode childNode = JSONObject.parseObject(processJson, new TypeReference<ChildNode>(){});
+        // 2. 表单的设置
         String settingsJson = flowEngineDTO.getSettings();
         SettingsInfo settingsInfo = JSONObject.parseObject(settingsJson, new TypeReference<SettingsInfo>() {});
         String remark = flowEngineDTO.getRemark();
@@ -338,6 +339,8 @@ public class SettingServiceImpl implements SettingService {
         String formName = flowEngineDTO.getFormName();
         String logo = flowEngineDTO.getLogo();
         Integer groupId = flowEngineDTO.getGroupId();
+
+        // 3. 存储模板引擎
         String templateId = idWorker.nextId()+"";
 
         ProcessTemplates processTemplates = ProcessTemplates.builder().build();
@@ -361,6 +364,7 @@ public class SettingServiceImpl implements SettingService {
         processTemplates.setUpdated(date);
         processTemplateService.save(processTemplates);
 
+        // 4. 保存模板群组
         TemplateGroup templateGroup=new TemplateGroup();
         templateGroup.setTemplateId(processTemplates.getTemplateId());
         templateGroup.setGroupId(groupId);
@@ -368,12 +372,13 @@ public class SettingServiceImpl implements SettingService {
         templateGroup.setCreated(date);
         templateGroupService.save(templateGroup);
 
+        // 5. json to Bpmn模型
         JSONObject jsonObject=new JSONObject();
-        jsonObject.put("processJson", processJson);
-        jsonObject.put("formJson", formItems);
-        BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, remark, formName, groupId,
-            templateId);
+        jsonObject.put("processJson", processJson); // 审批流json内容
+        jsonObject.put("formJson", formItems); // 表单json内容
+        BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, remark, formName, groupId, templateId);
 
+        // 6. 部署模型
         repositoryService.createDeployment()
             .addBpmnModel(formName + ".bpmn", bpmnModel)
             .name(formName)
@@ -382,37 +387,41 @@ public class SettingServiceImpl implements SettingService {
     }
 
     /**
-     * 生成Bpmn模型
-     * @param jsonObject
-     * @param childNode
-     * @param remark
-     * @param formName
-     * @param groupId
-     * @param templateId
+     * 根据用户的json配置生成Bpmn模型
+     * @param jsonObject    表单+审批流的内容 {'processJson':审批流内容,'formJson':表单json}
+     * @param childNode     审批流内容转为bpmn ChildNode节点的内容
+     * @param remark        备注
+     * @param formName      表单名称
+     * @param groupId       表单所在分组ID
+     * @param templateId    模板ID
      * @return
      */
     private BpmnModel assemBpmnModel(JSONObject jsonObject, ChildNode childNode, String remark, String formName, Integer groupId, String templateId)
         {
-        BpmnModel bpmnModel =new BpmnModel();
-        List<SequenceFlow> sequenceFlows = Lists.newArrayList();
-        Map<String,ChildNode> childNodeMap=new HashMap<>();
+        BpmnModel bpmnModel =new BpmnModel();  // bpmn模型对象
+        List<SequenceFlow> sequenceFlows = Lists.newArrayList(); // 箭头流
+        Map<String,ChildNode> childNodeMap=new HashMap<>(); // 子节点map。key: 当前ChildNode的ID，value:当前ChildNode。
+
         bpmnModel.setTargetNamespace(groupId+"");
+
         ExtensionAttribute extensionAttribute=new ExtensionAttribute();
         extensionAttribute.setName("DingDing");
         extensionAttribute.setNamespace("http://flowable.org/bpmn");
         extensionAttribute.setValue(jsonObject.toJSONString());
+
         Process process =new Process();
         process.setId(WorkFlowConstants.PROCESS_PREFIX+templateId);
         process.setName(formName);
         process.setDocumentation(remark);
         process.addAttribute(extensionAttribute);
+
         bpmnModel.addProcess(process);
 
         // 启动节点
         StartEvent startEvent = createStartEvent();
         process.addFlowElement(startEvent);
 
-
+        // 流程图中最后一个ChildNode的ID
         String lastNode = null;
         try {
             lastNode = create(startEvent.getId(), childNode,process,bpmnModel,sequenceFlows,childNodeMap);
@@ -423,11 +432,13 @@ public class SettingServiceImpl implements SettingService {
             e.printStackTrace();
             throw new WorkFlowException("操作失败");
         }
+
         // 结束节点
         EndEvent endEvent = createEndEvent();
         process.addFlowElement(endEvent);
 
         process.addFlowElement(connect(lastNode, endEvent.getId(),sequenceFlows,childNodeMap,process));
+
         List<FlowableListener> executionListeners =new ArrayList<>();
         FlowableListener flowableListener=new FlowableListener();
         flowableListener.setEvent(ExecutionListener.EVENTNAME_END);
