@@ -290,6 +290,10 @@ public class WorkspaceProcessController {
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+
+        if(task == null){
+            return Result.error("任务不存在");
+        }
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {

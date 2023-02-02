@@ -341,7 +341,7 @@ public class BpmnModelUtils {
     private static String createExclusiveGatewayBuilder(String formId,  ChildNode flowNode,Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
         childNodeMap.put(flowNode.getId(),flowNode);
         String name =flowNode.getName();
-        String exclusiveGatewayId = flowNode.getId();
+        String exclusiveGatewayId = flowNode.getId(); // 排他网关节点ID
         ExclusiveGateway exclusiveGateway = new ExclusiveGateway();
         exclusiveGateway.setId(exclusiveGatewayId);
         exclusiveGateway.setName(name);
@@ -351,7 +351,7 @@ public class BpmnModelUtils {
         if (Objects.isNull(flowNode.getBranchs()) && Objects.isNull(flowNode.getChildren())) {
             return exclusiveGatewayId;
         }
-        List<ChildNode> flowNodes = flowNode.getBranchs();
+        List<ChildNode> flowNodes = flowNode.getBranchs(); // 排他网关选择项
         List<String> incoming = Lists.newArrayListWithCapacity(flowNodes.size());
         List<JSONObject> conditions = Lists.newCopyOnWriteArrayList();
         for (ChildNode element : flowNodes) {
@@ -361,7 +361,6 @@ public class BpmnModelUtils {
             String nodeName = element.getName();
             Properties props = element.getProps();
             String expression = props.getExpression();
-
 
             if (Objects.isNull(childNode) ||  StringUtils.isBlank(childNode.getId())) {
 
@@ -402,9 +401,8 @@ public class BpmnModelUtils {
         if (Objects.nonNull(childNode) &&StringUtils.isNotBlank(childNode.getId()) ) {
             String parentId = childNode.getParentId();
             ChildNode parentChildNode = childNodeMap.get(parentId);
-            boolean conFlag = Type.CONCURRENTS.type
-                .equals(parentChildNode.getType());
-            if(!conFlag) {
+            boolean conFlag = Type.CONCURRENTS.type.equals(parentChildNode.getType()); // 并行
+            if(!conFlag) { // 非并行网关
                 String type = childNode.getType();
                 if(!Type.EMPTY.type.equals(type)){
                 }
@@ -619,6 +617,14 @@ public class BpmnModelUtils {
         return parallelGatewayId;
     }
 
+    /**
+     * 创建用户任务
+     * @param process 流程实例
+     * @param flowNode  json配置实例
+     * @param sequenceFlows 连线列表
+     * @param childNodeMap  节点列表
+     * @return
+     */
     private static String createTask(Process process,ChildNode flowNode,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) {
         JSONObject incomingJson = flowNode.getIncoming();
         List<String> incoming = incomingJson.getJSONArray("incoming").toJavaList(String.class);

@@ -424,6 +424,7 @@ public class SettingServiceImpl implements SettingService {
         // 流程图中最后一个ChildNode的ID
         String lastNode = null;
         try {
+            // 递归创建所有的节点，返回最后一个
             lastNode = create(startEvent.getId(), childNode,process,bpmnModel,sequenceFlows,childNodeMap);
         } catch (InvocationTargetException e) {
             e.printStackTrace();
@@ -437,7 +438,7 @@ public class SettingServiceImpl implements SettingService {
         EndEvent endEvent = createEndEvent();
         process.addFlowElement(endEvent);
 
-        process.addFlowElement(connect(lastNode, endEvent.getId(),sequenceFlows,childNodeMap,process));
+        process.addFlowElement(connect(lastNode, endEvent.getId(),sequenceFlows,childNodeMap,process)); // 连接结束节点
 
         List<FlowableListener> executionListeners =new ArrayList<>();
         FlowableListener flowableListener=new FlowableListener();
