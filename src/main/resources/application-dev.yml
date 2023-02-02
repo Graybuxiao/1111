@@ -2,14 +2,14 @@
 server:
   tomcat:
     uri-encoding: UTF-8 #tomcat编码
-  port: 9999 #tomcat端口
+  port: 12000 #tomcat端口
 
   #===================== 数据源配置 =====================
 spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: dm.jdbc.driver.DmDriver
-    url: jdbc:dm://111.206.173.106:5238/SYSDBA?nullCatalogMeansCurrent=true
+    url: jdbc:dm://999.999.999.999:5239/LCDP?nullCatalogMeansCurrent=true
     username: SYSDBA
     password: SYSDBA
   #===================== Redis配置 =====================
