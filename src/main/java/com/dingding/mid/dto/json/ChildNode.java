@@ -36,5 +36,10 @@ public class ChildNode {
   private List<ChildNode> branchs;
   private String parallelStr;
   private JSONObject incoming=new JSONObject();
+
+  /**
+   * 排他网关的默认顺序流
+   */
+  private String defaultBranch;
 }
 

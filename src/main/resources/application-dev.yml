@@ -67,6 +67,7 @@ flowable:
     enabled: false
   eventregistry:
     enabled: false
+  database-schema-update: drop-create
 
 config:
   minio:
