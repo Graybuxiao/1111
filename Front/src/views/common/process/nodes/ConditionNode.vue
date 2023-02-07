@@ -1,14 +1,15 @@
 <template>
   <div :class="{'node': true, 'node-error-state': showError}">
     <div :class="{'node-body': true, 'error': showError}">
-      <div class="node-body-left" @click="$emit('leftMove')" v-if="level > 1 && $store.state.diagramMode !== 'viewer'">
+      <div class="node-body-left" @click="$emit('leftMove')" v-if="level > 1">
         <i class="el-icon-arrow-left"></i>
       </div>
       <div class="node-body-main" @click="$emit('selected')">
         <div class="node-body-main-header">
+          <!-- <span v-if="config.props.userAll">全部人 </span> -->
           <ellipsis class="title" hover-tip :content="config.name ? config.name : ('条件' + level)"/>
           <span class="level">优先级{{ level }}</span>
-          <span class="option"  v-if="$store.state.diagramMode !== 'viewer'">
+          <span class="option">
             <el-tooltip effect="dark" content="复制条件" placement="top">
               <i class="el-icon-copy-document" @click.stop="$emit('copy')"></i>
             </el-tooltip>
@@ -20,7 +21,7 @@
           <ellipsis hoverTip :row="4" :content="content" v-else/>
         </div>
       </div>
-      <div class="node-body-right" @click="$emit('rightMove')" v-if="level < size && $store.state.diagramMode !== 'viewer'">
+      <div class="node-body-right" @click="$emit('rightMove')" v-if="level < size">
         <i class="el-icon-arrow-right"></i>
       </div>
       <div class="node-error" v-if="showError">
@@ -31,7 +32,7 @@
     </div>
     <div class="node-footer">
       <div class="btn">
-        <insert-button v-if="$store.state.diagramMode !== 'viewer'" @insertNode="type => $emit('insertNode', type)"></insert-button>
+        <insert-button @insertNode="type => $emit('insertNode', type)"></insert-button>
       </div>
     </div>
   </div>
@@ -45,6 +46,13 @@ export default {
   name: "ConditionNode",
   components: {InsertButton},
   props: {
+    // 母节点
+    parentNode: {
+      type: Object,
+      default: () => {
+        return {}
+      }
+    },
     config: {
       type: Object,
       default: () => {
@@ -99,7 +107,20 @@ export default {
         confitions.push(subConditions.length > 1 ? `(${subConditionsStr})` : subConditionsStr)
       })
       //构建最终描述
-      return String(confitions).replaceAll(',', (this.config.props.groupsType === 'AND' ? ' 且 ' : ' 或 '))
+      // return String(confitions).replaceAll(',', (this.config.props.groupsType === 'AND' ? ' 且 ' : ' 或 '))
+      let contentText = String(confitions).replaceAll(',', (this.config.props.groupsType === 'AND' ? ' 且 ' : ' 或 '))
+      let isUserAll = null;
+      if(this.parentNode.branchs){
+        isUserAll =  this.parentNode.branchs.some(item => item.props.userAll )
+      }
+      if(this.config.props.userAll){
+        this.parentNode.defaultNode = this.config.id
+      }
+      if( !isUserAll ){
+        this.parentNode.defaultNode = ''
+      }
+      return this.config.props.userAll  && !contentText ? "无条件，默认满足" : contentText
+      // return this.config.props.userAll ? "无条件，默认满足" : contentText
     }
   },
   methods: {
@@ -128,14 +149,6 @@ export default {
     },
     //校验数据配置的合法性
     validate(err) {
-      console.log('condition children', this.config.children)
-      if (!this.config.children?.id) {
-        this.showError = true
-        this.errorInfo = '条件分支后不能为空'
-        err.push(`条件分支后不能为空`)
-        return !this.showError
-      }
-
       const props = this.config.props
       if (props.groups.length <= 0){
         this.showError = true

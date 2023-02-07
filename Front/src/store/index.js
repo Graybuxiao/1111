@@ -9,6 +9,7 @@ export default new Vuex.Store({
     nodeMap: new Map(),
     isEdit: null,
     selectedNode: {},
+    selectedParentNode:{},
     selectFormItem: null,
     design:{},
     runningList: [],
@@ -17,6 +18,9 @@ export default new Vuex.Store({
     diagramMode: 'design',
   },
   mutations: {
+    selectedParentNode(state, val) {
+      state.selectedParentNode = val
+    },
     selectedNode(state, val) {
       state.selectedNode = val
     },

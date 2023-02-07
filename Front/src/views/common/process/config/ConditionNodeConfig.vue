@@ -1,6 +1,13 @@
 <template>
   <div>
     <el-form inline label-width="100px">
+    <el-form-item>
+      <el-form-item label="默认分支" >
+        <el-switch v-model="config.userAll" :disabled="userAllDisabled"  active-color="#409EFF"
+                   inactive-color="#c1c1c1" :active-value="true" :inactive-value="false"
+                   active-text="是" inactive-text="否">
+        </el-switch>
+      </el-form-item>
       <el-form-item label="调整优先级" prop="level">
         <el-popover placement="right" title="拖拽条件调整优先级顺序" width="250" trigger="click">
           <draggable style="width: 100%; min-height:25px" :list="prioritySortList" group="from" :options="sortOption">
@@ -13,24 +20,30 @@
           <el-button icon="el-icon-sort" size="small" slot="reference">第{{ nowNodeLeave + 1 }}级</el-button>
         </el-popover>
       </el-form-item>
-      <el-form-item label="条件组关系" label-width="150px">
+      <el-form-item v-if="!config.userAll" label="条件组关系" label-width="100px">
         <el-switch v-model="config.groupsType" active-color="#409EFF"
                    inactive-color="#c1c1c1" active-value="AND" inactive-value="OR"
                    active-text="且" inactive-text="或">
         </el-switch>
       </el-form-item>
-      <el-form-item label="条件组表达式">
+
+    </el-form-item>
+
+      <el-form-item v-if="!config.userAll" label="条件组表达式">
         <el-input size="mini" v-model="config.expression" placeholder="输入条件组关系表达式  &为与，|为或"/>
         <span class="item-desc">使用表达式构建复杂逻辑，例如: (A & B) | C</span>
       </el-form-item>
     </el-form>
-    <div>
+    <div v-if="!config.userAll">
       <el-button type="primary" size="mini" icon="el-icon-plus" style="margin: 0 15px 15px 0" round @click="addConditionGroup">
         添加条件组
       </el-button>
       <span class="item-desc">只有必填选项才能作为审批条件</span>
     </div>
-    <group-item/>
+    <div v-if="!config.userAll">
+      <group-item/>
+    </div>
+    
   </div>
 </template>
 
@@ -50,6 +63,10 @@ export default {
     }
   },
   computed: {
+    // 母节点
+    parentNode() {
+      return this.$store.state.selectedParentNode
+    },
     selectedNode() {
       return this.$store.state.selectedNode
     },
@@ -62,11 +79,16 @@ export default {
     //条件节点
     prioritySortList() {
       let node = this.$store.state.nodeMap.get(this.selectedNode.parentId)
-      console.log(this.selectedNode.id, node)
+      console.log(this.selectedNode.id, node,'条件节点')
       if (node) {
         return node.branchs || []
       }
       return []
+    },
+    userAllDisabled() {
+      // let node = this.$store.state.nodeMap.get(this.selectedNode.parentId)
+      return this.parentNode.branchs.some(item => item.props.userAll && this.selectedNode.id !== item.id )
+      // return node.branchs.some(item => item.props.userAll && this.selectedNode.id !== item.id )
     }
   },
   data() {
