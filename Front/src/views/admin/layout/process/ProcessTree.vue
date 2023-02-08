@@ -17,7 +17,7 @@ export default {
   components: {Node, Root, Approval, Cc, Trigger, Concurrent, Condition, Delay, Empty},
   data() {
     return {
-      valid: true,
+      valid: true
     }
   },
   computed:{
@@ -53,7 +53,7 @@ export default {
           //处理每个分支内子节点
           this.toMapping(branchNode);
           let childDoms = this.getDomTree(h, branchNode.children)
-          this.decodeAppendDom(h, branchNode, childDoms, {level: index + 1, size: node.branchs.length,parentNode:node},node)
+          this.decodeAppendDom(h, branchNode, childDoms, {level: index + 1, size: node.branchs.length})
           //插入4条横线，遮挡掉条件节点左右半边线条
           this.insertCoverLine(h, index, childDoms, node.branchs)
           //遍历子分支尾部分支
@@ -84,7 +84,7 @@ export default {
       }
     },
     //解码渲染的时候插入dom到同级
-    decodeAppendDom(h, node, dom, props = {},parentNode){
+    decodeAppendDom(h, node, dom, props = {}){
       props.config = node
       dom.unshift(h(node.type.toLowerCase(), {
         props: props,
@@ -94,7 +94,7 @@ export default {
         on:{
           insertNode: type => this.insertNode(type, node),
           delNode: () => this.delNode(node),
-          selected: () => this.selectNode(node,parentNode),
+          selected: () => this.selectNode(node),
           copy:() => this.copyBranch(node),
           leftMove: () => this.branchMove(node, -1),
           rightMove: () => this.branchMove(node, 1)
@@ -168,11 +168,9 @@ export default {
       return `node_${new Date().getTime().toString().substring(5)}${Math.round(Math.random()*9000+1000)}`
     },
     //选中一个节点
-    selectNode(node,parentNode){
+    selectNode(node){
       this.$store.commit('selectedNode', node)
-      this.$store.commit('selectedParentNode', parentNode)
       this.$emit('selectedNode', node)
-      console.log('选中')
     },
     //处理节点插入逻辑
     insertNode(type, parentNode){
@@ -226,9 +224,6 @@ export default {
       this.$set(parentNode.children, "props", this.$deepCopy(DefaultProps.TRIGGER_PROPS))
     },
     insertConditionsNode(parentNode){
-      console.log(parentNode,'parentNode')
-      const defaultNodeId = this.getRandomId()
-      // this.$set(parentNode.children, "defaultNode", defaultNodeId)
       this.$set(parentNode.children, "name", "条件分支")
       this.$set(parentNode.children, 'children', {
         id: this.getRandomId(),
@@ -237,10 +232,10 @@ export default {
       })
       this.$set(parentNode.children, "branchs", [
         {
-          id: defaultNodeId,
+          id: this.getRandomId(),
           parentId: parentNode.children.id,
           type: "CONDITION",
-          props: Object.assign({defaultBranch:true},this.$deepCopy(DefaultProps.CONDITION_PROPS)),
+          props: this.$deepCopy(DefaultProps.CONDITION_PROPS),
           name: "条件1",
           children:{}
         },{
@@ -252,9 +247,6 @@ export default {
           children:{}
         }
       ])
-      // let node = this.$store.state.nodeMap.get(parentNode.id)
-      // node.defaultNode = parentNode.children.branchs[0].id
-
     },
     insertConcurrentsNode(parentNode){
       this.$set(parentNode.children, "name", "并行分支")
@@ -281,23 +273,22 @@ export default {
         }
       ])
     },
-    getBranchEndNode(conditionNode){ 
+    getBranchEndNode(conditionNode){
       if (!conditionNode.children || !conditionNode.children.id){
         return conditionNode;
       }
       return this.getBranchEndNode(conditionNode.children);
     },
     addBranchNode(node){
-      let branchId = this.getRandomId()
       if (node.branchs.length < 8){
         node.branchs.push({
-          id: branchId,
+          id: this.getRandomId(),
           parentId: node.id,
           name: (this.isConditionNode(node) ? '条件':'分支') + (node.branchs.length + 1),
           props: this.isConditionNode(node) ? this.$deepCopy(DefaultProps.CONDITION_PROPS):{},
           type: this.isConditionNode(node) ? "CONDITION":"CONCURRENT",
           children:{}
-        }) 
+        })
       }else {
         this.$message.warning("最多只能添加 8 项😥")
       }
@@ -355,7 +346,7 @@ export default {
       return err
     },
     validateNode(err, node){
-      if (this.$refs[node.id].validate && !node.props.defaultBranch){
+      if (this.$refs[node.id].validate){
         this.valid = this.$refs[node.id].validate(err)
       }
     },
@@ -379,7 +370,6 @@ export default {
     },
     //校验所有节点设置
     validate(err, node){
-      console.log(node,'nnnnn')
       if (this.isPrimaryNode(node)){
         this.validateNode(err, node)
         this.validate(err, node.children)
