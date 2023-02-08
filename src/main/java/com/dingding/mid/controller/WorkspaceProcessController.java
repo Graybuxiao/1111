@@ -655,15 +655,24 @@ public class WorkspaceProcessController {
     @PostMapping("process/instanceInfo")
     public Result<HandleDataVO> instanceInfo(@RequestBody HandleDataDTO HandleDataDTO){
         String processInstanceId = HandleDataDTO.getProcessInstanceId();
-        HistoricProcessInstance historicProcessInstance = historyService.createHistoricProcessInstanceQuery().processInstanceId(processInstanceId)
-                .includeProcessVariables().singleResult();
-        String processDefinitionKey = historicProcessInstance.getProcessDefinitionKey();
-        ProcessTemplates processTemplates = processTemplateService.getById(processDefinitionKey.replace(PROCESS_PREFIX,""));
+        HistoricProcessInstance historicProcessInstance = historyService
+                .createHistoricProcessInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .includeProcessVariables()
+                .singleResult();
+        String processDefinitionKey = historicProcessInstance.getProcessDefinitionKey(); // 流程定义Key
+        String processDefinitionId = historicProcessInstance.getProcessDefinitionId(); // 流程定义ID
+
+        ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery().processDefinitionId(processDefinitionId).singleResult();
+
+        // 流程模板
+        String templateId = processDefinitionKey.replace(PROCESS_PREFIX, "");
+        ProcessTemplates processTemplates = processTemplateService.getById(templateId);
         processTemplates.setLogo(processTemplates.getIcon());
         processTemplates.setFormId(processTemplates.getTemplateId());
         processTemplates.setFormName(processTemplates.getTemplateName());
         processTemplates.setProcessDefinitionId(historicProcessInstance.getProcessDefinitionId());
-
+        
         HandleDataVO handleDataVO =new HandleDataVO();
         Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
 
@@ -708,8 +717,6 @@ public class WorkspaceProcessController {
                 }
             }
         }
-
-
 
 
         List<HistoricActivityInstance> list = historyService.createHistoricActivityInstanceQuery().processInstanceId(historicProcessInstance.getId()).list();

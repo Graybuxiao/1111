@@ -1,7 +1,6 @@
 package com.dingding.mid.utils;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dingding.mid.dto.json.ChildNode;
@@ -26,7 +25,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.dingding.mid.common.WorkFlowConstants.*;
-import static org.flowable.bpmn.model.ImplementationType.IMPLEMENTATION_TYPE_CLASS;
 import static org.flowable.bpmn.model.ImplementationType.IMPLEMENTATION_TYPE_DELEGATEEXPRESSION;
 
 /**
@@ -332,8 +330,8 @@ public class BpmnModelUtils {
         // 2. 顺序流：fromId->当前排他网关
         process.addFlowElement(connect(formId, exclusiveGatewayId, sequenceFlows, childNodeMap, process));
 
-        if(StringUtils.isNotBlank(flowNode.getDefaultBranch())){
-            exclusiveGateway.setDefaultFlow(flowNode.getDefaultBranch());
+        if(StringUtils.isNotBlank(flowNode.getDefaultNode())){
+            exclusiveGateway.setDefaultFlow(flowNode.getDefaultNode());
         }
 
         if (Objects.isNull(flowNode.getBranchs()) && Objects.isNull(flowNode.getChildren())) {

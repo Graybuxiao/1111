@@ -49,8 +49,6 @@ spring:
           timeout: 20000 #I/O超时值(ms) 默认为无限超时
           userset: true #如果设置为true,则在isConnected()中使用RSET命令而不是NOOP命令 在某些情况下,sendmail在执行许多NOOP命令后响应缓存,使用RSET可以避免这个sendMail问题,默认为false
 
-
-
 flowable:
   dmn:
     enabled: false
@@ -67,7 +65,7 @@ flowable:
     enabled: false
   eventregistry:
     enabled: false
-  database-schema-update: drop-create
+  database-schema-update: true
 
 config:
   minio:

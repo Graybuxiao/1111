@@ -40,6 +40,6 @@ public class ChildNode {
   /**
    * 排他网关的默认顺序流
    */
-  private String defaultBranch;
+  private String defaultNode;
 }
 
