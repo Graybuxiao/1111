@@ -3,7 +3,7 @@
     <el-form inline label-width="100px">
     <el-form-item>
       <el-form-item label="默认分支" >
-        <el-switch v-model="config.userAll" :disabled="userAllDisabled"  active-color="#409EFF"
+        <el-switch v-model="config.userAll" :disabled="userAllDisabled" @change="userAllChange" active-color="#409EFF"
                    inactive-color="#c1c1c1" :active-value="true" :inactive-value="false"
                    active-text="是" inactive-text="否">
         </el-switch>
@@ -102,12 +102,19 @@ export default {
     }
   },
   methods: {
+    userAllChange(flag) {
+      if(flag){
+        this.$set(this.config,'groups',[])
+        this.addConditionGroup()
+      }
+    },
     addConditionGroup() {
       this.config.groups.push({
         cids:[],
         groupType: "OR",
         conditions:[]
       })
+      this.$forceUpdate();
     },
     selectUser() {
       this.showOrgSelect = true

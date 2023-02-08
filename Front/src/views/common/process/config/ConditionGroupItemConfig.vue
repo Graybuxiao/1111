@@ -1,6 +1,7 @@
 <template>
   <div>
-    <div v-for="(group, index) in selectedNode.props.groups" :key="index + '_g'" class="group">
+    <div>
+      <div v-for="(group, index) in selectedNode.props.groups" :key="index + '_g'" class="group">
       <div class="group-header">
         <span class="group-name">条件组 {{ groupNames[index] }}</span>
         <div class="group-cp">
@@ -77,6 +78,7 @@
             </el-form-item>
           </el-form>
         </div>
+      </div>
       </div>
     </div>
     <org-picker :type="orgType" multiple ref="orgPicker" :selected="users" @ok="selected"></org-picker>
