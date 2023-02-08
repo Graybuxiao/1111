@@ -6,7 +6,7 @@
       </div>
       <div class="node-body-main" @click="$emit('selected')">
         <div class="node-body-main-header">
-          <!-- <span v-if="config.props.userAll">全部人 </span> -->
+          <!-- <span v-if="config.props.defaultBranch">全部人 </span> -->
           <ellipsis class="title" hover-tip :content="config.name ? config.name : ('条件' + level)"/>
           <span class="level">优先级{{ level }}</span>
           <span class="option">
@@ -111,16 +111,16 @@ export default {
       let contentText = String(confitions).replaceAll(',', (this.config.props.groupsType === 'AND' ? ' 且 ' : ' 或 '))
       let isUserAll = null;
       if(this.parentNode.branchs){
-        isUserAll =  this.parentNode.branchs.some(item => item.props.userAll )
+        isUserAll =  this.parentNode.branchs.some(item => item.props.defaultBranch )
       }
-      if(this.config.props.userAll){
-        this.parentNode.defaultNode = this.config.id
-      }
-      if( !isUserAll ){
-        this.parentNode.defaultNode = ''
-      }
-      return this.config.props.userAll  ? "无条件，默认满足" : contentText
-      // return this.config.props.userAll ? "无条件，默认满足" : contentText
+      // if(this.config.props.defaultBranch){
+      //   this.parentNode.defaultNode = this.config.id
+      // }
+      // if( !isUserAll ){
+      //   this.parentNode.defaultNode = ''
+      // }
+      return this.config.props.defaultBranch  ? "无条件，默认满足" : contentText
+      // return this.config.props.defaultBranch ? "无条件，默认满足" : contentText
     }
   },
   methods: {

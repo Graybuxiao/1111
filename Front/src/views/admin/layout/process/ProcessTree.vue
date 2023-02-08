@@ -228,7 +228,7 @@ export default {
     insertConditionsNode(parentNode){
       console.log(parentNode,'parentNode')
       const defaultNodeId = this.getRandomId()
-      this.$set(parentNode.children, "defaultNode", defaultNodeId)
+      // this.$set(parentNode.children, "defaultNode", defaultNodeId)
       this.$set(parentNode.children, "name", "条件分支")
       this.$set(parentNode.children, 'children', {
         id: this.getRandomId(),
@@ -240,7 +240,7 @@ export default {
           id: defaultNodeId,
           parentId: parentNode.children.id,
           type: "CONDITION",
-          props: Object.assign({userAll:true},this.$deepCopy(DefaultProps.CONDITION_PROPS)),
+          props: Object.assign({defaultBranch:true},this.$deepCopy(DefaultProps.CONDITION_PROPS)),
           name: "条件1",
           children:{}
         },{
@@ -355,7 +355,7 @@ export default {
       return err
     },
     validateNode(err, node){
-      if (this.$refs[node.id].validate && !node.props.userAll){
+      if (this.$refs[node.id].validate && !node.props.defaultBranch){
         this.valid = this.$refs[node.id].validate(err)
       }
     },
