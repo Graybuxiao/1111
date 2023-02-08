@@ -119,7 +119,7 @@ export default {
       if( !isUserAll ){
         this.parentNode.defaultNode = ''
       }
-      return this.config.props.userAll  && !contentText ? "无条件，默认满足" : contentText
+      return this.config.props.userAll  ? "无条件，默认满足" : contentText
       // return this.config.props.userAll ? "无条件，默认满足" : contentText
     }
   },
