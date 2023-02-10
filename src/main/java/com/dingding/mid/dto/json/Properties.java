@@ -68,4 +68,6 @@ public class Properties {
   //
   private HttpInfo http;
   private EmailInfo email;
+
+  private boolean defaultBranch;
 }
