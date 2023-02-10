@@ -66,6 +66,7 @@ public class BpmnModelUtils {
     public static SequenceFlow connect(String from, String to,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap,Process process) {
         SequenceFlow flow = new SequenceFlow();
         String sequenceFlowId = id("sequenceFlow");
+
         if(process.getFlowElement(from) !=null && process.getFlowElement(from) instanceof ExclusiveGateway){ // 上游节点为排他网关
             ExclusiveGateway exclusiveGateway = (ExclusiveGateway)process.getFlowElement(from); // 上游节点
             ChildNode childNode = childNodeMap.get(to);
@@ -75,6 +76,9 @@ public class BpmnModelUtils {
                     ChildNode parentNode = childNodeMap.get(parentId);
                     if (parentNode != null) {
                         if (Type.CONDITION.type.equals(parentNode.getType())) {
+
+                            StringBuffer conditionExpression = new StringBuffer();
+
                             sequenceFlowId = parentNode.getId();
                             flow.setName(parentNode.getName());
                             //解析条件表达式
@@ -83,9 +87,8 @@ public class BpmnModelUtils {
                             List<GroupsInfo> groups = props.getGroups();
                             String groupsType = props.getGroupsType();
                             if (StringUtils.isNotBlank(expression)) {
-                                flow.setConditionExpression("${" + expression + "}");
+                                conditionExpression.append("${").append(expression).append("}");
                             } else {
-                                StringBuffer conditionExpression = new StringBuffer();
                                 conditionExpression.append("${ ");
 
                                 for (int i = 0; i < groups.size(); i++) {
@@ -203,8 +206,14 @@ public class BpmnModelUtils {
                                     }
                                 }
                                 conditionExpression.append("} ");
-                                if(StringUtils.isBlank(exclusiveGateway.getDefaultFlow()))
-                                    flow.setConditionExpression(conditionExpression.toString());
+                            }
+
+                            // 排他网关默认流为空默认流不是本节点，才进行条件的设置
+                            if(StringUtils.isNotBlank(exclusiveGateway.getDefaultFlow())
+                                    && exclusiveGateway.getDefaultFlow().equals(parentId)){ // 排他网关的默认流
+
+                            }else if(conditionExpression.length() > 0){
+                                flow.setConditionExpression(conditionExpression.toString());
                             }
                         }
                     }
