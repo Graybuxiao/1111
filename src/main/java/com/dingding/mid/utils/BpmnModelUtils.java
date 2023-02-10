@@ -13,6 +13,7 @@ import com.dingding.mid.exception.WorkFlowException;
 import com.dingding.mid.service.UserService;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import liquibase.pro.packaged.J;
 import org.apache.commons.lang3.StringUtils;
 import org.flowable.bpmn.model.*;
 import org.flowable.bpmn.model.Process;
@@ -67,147 +68,143 @@ public class BpmnModelUtils {
         String sequenceFlowId = id("sequenceFlow");
         if(process.getFlowElement(from) !=null && process.getFlowElement(from) instanceof ExclusiveGateway){ // 上游节点为排他网关
             ExclusiveGateway exclusiveGateway = (ExclusiveGateway)process.getFlowElement(from); // 上游节点
-            if(StringUtils.isNotBlank(exclusiveGateway.getDefaultFlow()) && exclusiveGateway.getDefaultFlow().equals(to)){
-                // 默认顺序流不设置条件表达式
-                exclusiveGateway.setDefaultFlow(sequenceFlowId);
-            }else{
-                ChildNode childNode = childNodeMap.get(to);
-                if (childNode != null) {
-                    String parentId = childNode.getParentId();
-                    if (StringUtils.isNotBlank(parentId)) {
-                        ChildNode parentNode = childNodeMap.get(parentId);
-                        if (parentNode != null) {
-                            if (Type.CONDITION.type.equals(parentNode.getType())) {
-                                sequenceFlowId = parentNode.getId();
-                                flow.setName(parentNode.getName());
-                                //解析条件表达式
-                                Properties props = parentNode.getProps();
-                                String expression = props.getExpression();
-                                List<GroupsInfo> groups = props.getGroups();
-                                String groupsType = props.getGroupsType();
-                                if (StringUtils.isNotBlank(expression)) {
-                                    flow.setConditionExpression("${" + expression + "}");
-                                } else {
-                                    StringBuffer conditionExpression = new StringBuffer();
-                                    conditionExpression.append("${ ");
+            ChildNode childNode = childNodeMap.get(to);
+            if (childNode != null) {
+                String parentId = childNode.getParentId();
+                if (StringUtils.isNotBlank(parentId)) {
+                    ChildNode parentNode = childNodeMap.get(parentId);
+                    if (parentNode != null) {
+                        if (Type.CONDITION.type.equals(parentNode.getType())) {
+                            sequenceFlowId = parentNode.getId();
+                            flow.setName(parentNode.getName());
+                            //解析条件表达式
+                            Properties props = parentNode.getProps();
+                            String expression = props.getExpression();
+                            List<GroupsInfo> groups = props.getGroups();
+                            String groupsType = props.getGroupsType();
+                            if (StringUtils.isNotBlank(expression)) {
+                                flow.setConditionExpression("${" + expression + "}");
+                            } else {
+                                StringBuffer conditionExpression = new StringBuffer();
+                                conditionExpression.append("${ ");
 
-                                    for (int i = 0; i < groups.size(); i++) {
-                                        conditionExpression.append(" ( ");
-                                        GroupsInfo group = groups.get(i);
-                                        List<String> cids = group.getCids();
-                                        String groupType = group.getGroupType();
-                                        List<ConditionInfo> conditions = group.getConditions();
-                                        for (int j = 0; j < conditions.size(); j++) {
-                                            conditionExpression.append(" ");
-                                            ConditionInfo condition = conditions.get(j);
-                                            String compare = condition.getCompare();
-                                            String id = condition.getId();
-                                            String title = condition.getTitle();
-                                            List<Object> value = condition.getValue();
-                                            String valueType = condition.getValueType();
-                                            if ("String".equals(valueType)) {
-                                                if ("=".equals(compare)) {
-                                                    String str = StringUtils.join(value, ",");
-                                                    str = "'" + str + "'";
-                                                    conditionExpression.append(" " + EXPRESSION_CLASS + "strEqualsMethod(" + id + "," + str + ") ");
-                                                } else {
-                                                    List<String> tempList = new ArrayList<>();
-                                                    for (Object o : value) {
-                                                        String s = o.toString();
-                                                        s = "'" + s + "'";
-                                                        tempList.add(s);
-                                                    }
-                                                    String str = StringUtils.join(tempList, ",");
-//                                                String str = StringUtils.join(value, ",");
-                                                    conditionExpression.append(" " + EXPRESSION_CLASS + "strContainsMethod(" + id + "," + str + ") ");
-                                                }
-                                            } else if ("Number".equals(valueType)) {
+                                for (int i = 0; i < groups.size(); i++) {
+                                    conditionExpression.append(" ( ");
+                                    GroupsInfo group = groups.get(i);
+                                    List<String> cids = group.getCids();
+                                    String groupType = group.getGroupType();
+                                    List<ConditionInfo> conditions = group.getConditions();
+                                    for (int j = 0; j < conditions.size(); j++) {
+                                        conditionExpression.append(" ");
+                                        ConditionInfo condition = conditions.get(j);
+                                        String compare = condition.getCompare();
+                                        String id = condition.getId();
+                                        String title = condition.getTitle();
+                                        List<Object> value = condition.getValue();
+                                        String valueType = condition.getValueType();
+                                        if ("String".equals(valueType)) {
+                                            if ("=".equals(compare)) {
                                                 String str = StringUtils.join(value, ",");
-                                                if ("=".equals(compare)) {
-                                                    conditionExpression.append(" " + id + " == " + str + " ");
-                                                } else if (">".equals(compare)) {
-                                                    conditionExpression.append("" + id + " > " + str + " ");
-                                                } else if (">=".equals(compare)) {
-                                                    conditionExpression.append(" " + id + " >= " + str + " ");
-                                                } else if ("<".equals(compare)) {
-                                                    conditionExpression.append(" " + id + " < " + str + " ");
-                                                } else if ("<=".equals(compare)) {
-                                                    conditionExpression.append(" " + id + " <= " + str + " ");
-                                                } else if ("IN".equals(compare)) {
-                                                    conditionExpression.append(" " + EXPRESSION_CLASS + "numberContains(" + id + "," + str + ") ");
-                                                } else if ("B".equals(compare)) {
-                                                    conditionExpression.append("  " + EXPRESSION_CLASS + "b(" + id + "," + str + ") ");
-                                                } else if ("AB".equals(compare)) {
-                                                    conditionExpression.append("  " + EXPRESSION_CLASS + "ab(" + id + "," + str + ") ");
-                                                } else if ("BA".equals(compare)) {
-                                                    conditionExpression.append("  " + EXPRESSION_CLASS + "ba(" + id + "," + str + ") ");
-                                                } else if ("ABA".equals(compare)) {
-                                                    conditionExpression.append("  " + EXPRESSION_CLASS + "aba(" + id + "," + str + ") ");
-                                                }
-                                            } else if ("User".equals(valueType)) {
-                                                List<String> userIds = new ArrayList<>();
+                                                str = "'" + str + "'";
+                                                conditionExpression.append(" " + EXPRESSION_CLASS + "strEqualsMethod(" + id + "," + str + ") ");
+                                            } else {
+                                                List<String> tempList = new ArrayList<>();
                                                 for (Object o : value) {
-                                                    JSONObject obj = (JSONObject) o;
+                                                    String s = o.toString();
+                                                    s = "'" + s + "'";
+                                                    tempList.add(s);
+                                                }
+                                                String str = StringUtils.join(tempList, ",");
+//                                                String str = StringUtils.join(value, ",");
+                                                conditionExpression.append(" " + EXPRESSION_CLASS + "strContainsMethod(" + id + "," + str + ") ");
+                                            }
+                                        } else if ("Number".equals(valueType)) {
+                                            String str = StringUtils.join(value, ",");
+                                            if ("=".equals(compare)) {
+                                                conditionExpression.append(" " + id + " == " + str + " ");
+                                            } else if (">".equals(compare)) {
+                                                conditionExpression.append("" + id + " > " + str + " ");
+                                            } else if (">=".equals(compare)) {
+                                                conditionExpression.append(" " + id + " >= " + str + " ");
+                                            } else if ("<".equals(compare)) {
+                                                conditionExpression.append(" " + id + " < " + str + " ");
+                                            } else if ("<=".equals(compare)) {
+                                                conditionExpression.append(" " + id + " <= " + str + " ");
+                                            } else if ("IN".equals(compare)) {
+                                                conditionExpression.append(" " + EXPRESSION_CLASS + "numberContains(" + id + "," + str + ") ");
+                                            } else if ("B".equals(compare)) {
+                                                conditionExpression.append("  " + EXPRESSION_CLASS + "b(" + id + "," + str + ") ");
+                                            } else if ("AB".equals(compare)) {
+                                                conditionExpression.append("  " + EXPRESSION_CLASS + "ab(" + id + "," + str + ") ");
+                                            } else if ("BA".equals(compare)) {
+                                                conditionExpression.append("  " + EXPRESSION_CLASS + "ba(" + id + "," + str + ") ");
+                                            } else if ("ABA".equals(compare)) {
+                                                conditionExpression.append("  " + EXPRESSION_CLASS + "aba(" + id + "," + str + ") ");
+                                            }
+                                        } else if ("User".equals(valueType)) {
+                                            List<String> userIds = new ArrayList<>();
+                                            for (Object o : value) {
+                                                JSONObject obj = (JSONObject) o;
+                                                userIds.add(obj.getString("id"));
+                                            }
+                                            String str = StringUtils.join(userIds, ",");
+                                            conditionExpression.append(" " + EXPRESSION_CLASS + "strContainsMethod(" + id + "," + str + ") ");
+                                        } else if ("Dept".equals(valueType)) {
+                                            List<String> userIds = new ArrayList<>();
+                                            List<String> deptIds = new ArrayList<>();
+                                            for (Object o : value) {
+                                                JSONObject obj = (JSONObject) o;
+                                                String type = obj.getString("type");
+                                                if ("dept".equals(type)) {
+                                                    deptIds.add(obj.getString("id"));
+                                                } else {
                                                     userIds.add(obj.getString("id"));
                                                 }
+                                            }
+
+                                            if (CollUtil.isNotEmpty(deptIds)) {
+                                                UserService userService = SpringContextHolder.getBean(UserService.class);
+                                                LambdaQueryWrapper<Users> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+                                                lambdaQueryWrapper.in(Users::getDepartmentIds, deptIds);
+                                                List<Users> list = userService.list(lambdaQueryWrapper);
+                                                for (Users users : list) {
+                                                    userIds.add(users.getUserId() + "");
+                                                }
+
+                                                if (userIds.isEmpty()) {userIds.add("0");}
                                                 String str = StringUtils.join(userIds, ",");
-                                                conditionExpression.append(" " + EXPRESSION_CLASS + "strContainsMethod(" + id + "," + str + ") ");
-                                            } else if ("Dept".equals(valueType)) {
-                                                List<String> userIds = new ArrayList<>();
-                                                List<String> deptIds = new ArrayList<>();
-                                                for (Object o : value) {
-                                                    JSONObject obj = (JSONObject) o;
-                                                    String type = obj.getString("type");
-                                                    if ("dept".equals(type)) {
-                                                        deptIds.add(obj.getString("id"));
-                                                    } else {
-                                                        userIds.add(obj.getString("id"));
-                                                    }
-                                                }
-
-                                                if (CollUtil.isNotEmpty(deptIds)) {
-                                                    UserService userService = SpringContextHolder.getBean(UserService.class);
-                                                    LambdaQueryWrapper<Users> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-                                                    lambdaQueryWrapper.in(Users::getDepartmentIds, deptIds);
-                                                    List<Users> list = userService.list(lambdaQueryWrapper);
-                                                    for (Users users : list) {
-                                                        userIds.add(users.getUserId() + "");
-                                                    }
-
-                                                    if (userIds.isEmpty()) {userIds.add("0");}
-                                                    String str = StringUtils.join(userIds, ",");
-                                                    conditionExpression.append(" " + EXPRESSION_CLASS + "strContains(" + id + "," + str + ") ");
-                                                }
-
-                                            } else {
-                                                continue;
+                                                conditionExpression.append(" " + EXPRESSION_CLASS + "strContains(" + id + "," + str + ") ");
                                             }
 
-                                            if (conditions.size() > 1 && j != (conditions.size() - 1)) {
-                                                if ("OR".equals(groupType)) {
-                                                    conditionExpression.append(" || ");
-                                                } else {
-                                                    conditionExpression.append(" && ");
-                                                }
-                                            }
-
-                                            if (i == (conditions.size() - 1)) {
-                                                conditionExpression.append(" ");
-                                            }
+                                        } else {
+                                            continue;
                                         }
-                                        conditionExpression.append(" ) ");
 
-                                        if (groups.size() > 1 && i != (groups.size() - 1)) {
-                                            if ("OR".equals(groupsType)) {
+                                        if (conditions.size() > 1 && j != (conditions.size() - 1)) {
+                                            if ("OR".equals(groupType)) {
                                                 conditionExpression.append(" || ");
                                             } else {
                                                 conditionExpression.append(" && ");
                                             }
                                         }
+
+                                        if (i == (conditions.size() - 1)) {
+                                            conditionExpression.append(" ");
+                                        }
                                     }
-                                    conditionExpression.append("} ");
-                                    flow.setConditionExpression(conditionExpression.toString());
+                                    conditionExpression.append(" ) ");
+
+                                    if (groups.size() > 1 && i != (groups.size() - 1)) {
+                                        if ("OR".equals(groupsType)) {
+                                            conditionExpression.append(" || ");
+                                        } else {
+                                            conditionExpression.append(" && ");
+                                        }
+                                    }
                                 }
+                                conditionExpression.append("} ");
+                                if(StringUtils.isBlank(exclusiveGateway.getDefaultFlow()))
+                                    flow.setConditionExpression(conditionExpression.toString());
                             }
                         }
                     }
@@ -247,7 +244,7 @@ public class BpmnModelUtils {
     }
 
 
-    public static String create(String fromId, ChildNode flowNode, Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
+    public static List<String> create(String fromId, ChildNode flowNode, Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
         String nodeType = flowNode.getType(); // 当前节点的网关类型
         if (Type.CONCURRENTS.isEqual(nodeType)) { // 并行网关
             return createParallelGatewayBuilder(fromId, flowNode,process,bpmnModel,sequenceFlows,childNodeMap);
@@ -265,7 +262,7 @@ public class BpmnModelUtils {
             if (Objects.nonNull(children) &&StringUtils.isNotBlank(children.getId())) { // 有子项，递归创建
                 return create(id, children,process,bpmnModel,sequenceFlows,childNodeMap);
             } else { // 终止条件：没有子项
-                return id;
+                return Arrays.asList(id);
             }
         } else if(Type.ROOT.isEqual(nodeType)){ // 根网关
             childNodeMap.put(flowNode.getId(),flowNode);
@@ -277,7 +274,7 @@ public class BpmnModelUtils {
             if (Objects.nonNull(children) &&StringUtils.isNotBlank(children.getId())) { // 有子项，递归创建
                 return create(id, children,process,bpmnModel,sequenceFlows,childNodeMap);
             } else { // 终止条件：没有子项
-                return id;
+                return Arrays.asList(id);
             }
         } else if(Type.DELAY.isEqual(nodeType)){ // 延时
             throw new WorkFlowException("还不想写这个功能");
@@ -315,7 +312,7 @@ public class BpmnModelUtils {
         }
     }
 
-    private static String createExclusiveGatewayBuilder(String formId,  ChildNode flowNode,Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
+    private static List<String> createExclusiveGatewayBuilder(String formId,  ChildNode flowNode,Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
         childNodeMap.put(flowNode.getId(),flowNode);
         String name =flowNode.getName();
         String exclusiveGatewayId = flowNode.getId(); // 排他网关节点ID（当前）
@@ -327,143 +324,148 @@ public class BpmnModelUtils {
 
         process.addFlowElement(exclusiveGateway);
 
-        // 2. 顺序流：fromId->当前排他网关
+        // 2. 顺序流：父节点->当前排他网关
         process.addFlowElement(connect(formId, exclusiveGatewayId, sequenceFlows, childNodeMap, process));
 
-        if(StringUtils.isNotBlank(flowNode.getDefaultNode())){
-            exclusiveGateway.setDefaultFlow(flowNode.getDefaultNode());
+        if (Objects.isNull(flowNode.getBranchs()) && Objects.isNull(flowNode.getChildren())) { // 排他网关下面没有分支
+            return Arrays.asList(exclusiveGatewayId);
         }
 
-        if (Objects.isNull(flowNode.getBranchs()) && Objects.isNull(flowNode.getChildren())) {
-            return exclusiveGatewayId;
-        }
-        List<ChildNode> flowNodes = flowNode.getBranchs(); // 排他网关选择项
-        List<String> incoming = Lists.newArrayListWithCapacity(flowNodes.size());
-        List<JSONObject> conditions = Lists.newCopyOnWriteArrayList();
+        List<ChildNode> flowNodes = flowNode.getBranchs(); // 排他网关分支
+        List<String> incoming = Lists.newCopyOnWriteArrayList();
+
+        List<JSONObject> conditions = Lists.newCopyOnWriteArrayList(); // 线程安全
+
+        Map<String,JSONObject> branchConditions = new HashMap<>();
 
         // 创建排他网关的分支branch
         for (ChildNode element : flowNodes) {
             childNodeMap.put(element.getId(),element);
-            ChildNode childNode = element.getChildren();
+            ChildNode childNode = element.getChildren(); // 获取分支的子节点
 
             String nodeName = element.getName();
             Properties props = element.getProps();
             String expression = props.getExpression();
 
-            if (Objects.isNull(childNode) ||  StringUtils.isBlank(childNode.getId())) {
-                incoming.add(exclusiveGatewayId);
-                JSONObject condition = new JSONObject();
-                condition.fluentPut("nodeName", nodeName)
-                        .fluentPut("expression", expression)
-                        .fluentPut("groups",props.getGroups())
-                        .fluentPut("groupsType",props.getGroupsType());
-                conditions.add(condition);
-                continue;
+            if(props !=null && props.isDefaultBranch()){ // 默认流
+                exclusiveGateway.setDefaultFlow(element.getId());
             }
-            // 只生成一个任务，同时设置当前任务的条件
-            JSONObject incomingObj = childNode.getIncoming();
-            incomingObj.put("incoming", Collections.singletonList(exclusiveGatewayId));
-            String identifier = create(exclusiveGatewayId, childNode,process,bpmnModel,sequenceFlows,childNodeMap);
 
-            List<SequenceFlow> flows = sequenceFlows.stream()
-                    .filter(flow -> StringUtils.equals(exclusiveGatewayId, flow.getSourceRef()))
-                    .collect(Collectors.toList());
-            flows.forEach(
-                    e -> {
-                        if (StringUtils.isBlank(e.getName()) && StringUtils.isNotBlank(nodeName)) {
-                            e.setName(nodeName);
+            JSONObject condition = new JSONObject();
+            condition.fluentPut("nodeName", nodeName)
+                    .fluentPut("expression", expression)
+                    .fluentPut("groups",props.getGroups())
+                    .fluentPut("groupsType",props.getGroupsType())
+                    .fluentPut("finalSequenceFlowId",element.getId());
+            conditions.add(condition);
+
+            if(childNode==null || StringUtils.isBlank(childNode.getId())){ // 没有子项
+                incoming.add(element.getId());
+            }else{ // 有子项继续创建
+
+                incoming.addAll(create(exclusiveGatewayId, childNode,process,bpmnModel,sequenceFlows,childNodeMap));
+
+                List<SequenceFlow> flows = sequenceFlows.stream()
+                        .filter(flow -> StringUtils.equals(exclusiveGatewayId, flow.getSourceRef()))
+                        .collect(Collectors.toList());
+                flows.forEach(
+                        e -> {
+                            if (StringUtils.isBlank(e.getName()) && StringUtils.isNotBlank(nodeName)) {
+                                e.setName(nodeName);
+                            }
+                            // 设置条件表达式
+                            if (Objects.isNull(e.getConditionExpression())
+                                    && StringUtils.isNotBlank(expression)
+                                    && !e.getId().equals(exclusiveGateway.getDefaultFlow())) {
+                                e.setConditionExpression(expression);
+                            }
                         }
-                        // 设置条件表达式
-                        if (Objects.isNull(e.getConditionExpression())
-                                && StringUtils.isNotBlank(expression)
-                                && !e.getId().equals(exclusiveGateway.getDefaultFlow())) {
-                            e.setConditionExpression(expression);
-                        }
-                    }
-            );
-            if (Objects.nonNull(identifier)) {
-                incoming.add(identifier);
+                );
             }
         }
 
-        ChildNode childNode = flowNode.getChildren();
-        if (Objects.nonNull(childNode) &&StringUtils.isNotBlank(childNode.getId()) ) {
-            String parentId = childNode.getParentId();
-            ChildNode parentChildNode = childNodeMap.get(parentId);
-            boolean conFlag = Type.CONCURRENTS.type.equals(parentChildNode.getType()); // 并行
-            if(!conFlag) { // 非并行网关
-                String type = childNode.getType();
-                if(!Type.EMPTY.type.equals(type)){
-                }
-                else{
-                    if(Type.CONDITIONS.type.equals(parentChildNode.getType())){ // 网关分支
-                        String endExId=parentChildNode.getId()+"end";
-                        process.addFlowElement(createExclusiveGateWayEnd(endExId));
-                        if (incoming.isEmpty()) {
-                            return create(exclusiveGatewayId, childNode, process, bpmnModel, sequenceFlows, childNodeMap);
-                        }
-                        else {
-                            JSONObject incomingObj = childNode.getIncoming();
-                            // 所有 service task 连接 end exclusive gateway
-                            incomingObj.put("incoming", incoming);
-                            FlowElement flowElement = bpmnModel.getFlowElement(incoming.get(0));
-                            // 1.0 先进行边连接, 暂存 nextNode
-                            ChildNode nextNode = childNode.getChildren();
-                            childNode.setChildren(null);
-                            String identifier = endExId;
-                            for (int i = 0; i < incoming.size(); i++) {
-                                process.addFlowElement(connect(incoming.get(i), identifier, sequenceFlows,childNodeMap,process));
-                            }
-
-                            //  针对 gateway 空任务分支 添加条件表达式
-                            if (!conditions.isEmpty()) {
-                                FlowElement flowElement1 = bpmnModel.getFlowElement(identifier);
-                                // 获取从 gateway 到目标节点 未设置条件表达式的节点
-                                List<SequenceFlow> flows = sequenceFlows.stream().filter(
-                                    flow -> StringUtils.equals(flowElement1.getId(), flow.getTargetRef()))
-                                    .filter(
-                                        flow -> StringUtils.equals(flow.getSourceRef(), exclusiveGatewayId))
-                                    .collect(Collectors.toList());
-                                flows.stream().forEach(sequenceFlow -> {
-                                    if (!conditions.isEmpty()) {
-                                        JSONObject condition = conditions.get(0);
-                                        String nodeName = condition.getString("nodeName");
-                                        String expression = condition.getString("expression");
-
-                                        if (StringUtils.isBlank(sequenceFlow.getName()) && StringUtils
-                                            .isNotBlank(nodeName)) {
-                                            sequenceFlow.setName(nodeName);
-                                        }
-                                        // 设置条件表达式
-                                        if (Objects.isNull(sequenceFlow.getConditionExpression())
-                                            && StringUtils.isNotBlank(expression)) {
-                                            sequenceFlow.setConditionExpression(expression);
-                                        }
-
-                                        conditions.remove(0);
-                                    }
-                                });
-
-                            }
-
-                            // 1.1 边连接完成后，在进行 nextNode 创建
-                            if (Objects.nonNull(nextNode) &&StringUtils.isNotBlank(nextNode.getId())) {
-                                return create(identifier, nextNode, process, bpmnModel, sequenceFlows,
-                                    childNodeMap);
-                            } else {
-                                return identifier;
-                            }
-                        }
-
-
-                    }
-                }
-            }
-            else{
-                System.err.println("-");
-            }
-        }
-        return exclusiveGatewayId;
+        // 遍历child
+//        ChildNode childNode = flowNode.getChildren();
+//        if (Objects.nonNull(childNode) &&StringUtils.isNotBlank(childNode.getId()) ) {
+//            String parentId = childNode.getParentId();
+//            ChildNode parentChildNode = childNodeMap.get(parentId);
+//            boolean conFlag = Type.CONCURRENTS.type.equals(parentChildNode.getType()); // 并行
+//            if(!conFlag) { // 非并行网关
+//                String type = childNode.getType();
+//                if(!Type.EMPTY.type.equals(type)){
+//                }
+//                else{
+//                    if(Type.CONDITIONS.type.equals(parentChildNode.getType())){ // 网关分支
+//
+//                        // 这里为什么塞个排他网关在后面
+//                        String endExId=parentChildNode.getId()+"end";
+//                        process.addFlowElement(createExclusiveGateWayEnd(endExId));
+//
+//
+//                        if (incoming.isEmpty()) {
+//                            return create(exclusiveGatewayId, childNode, process, bpmnModel, sequenceFlows, childNodeMap);
+//                        }
+//                        else {
+//                            // 1.0 先进行边连接, 暂存 nextNode
+//                            ChildNode nextNode = childNode.getChildren();
+//                            childNode.setChildren(null);
+//                            for (int i = 0; i < incoming.size(); i++) {
+//                                process.addFlowElement(connect(incoming.get(i), endExId, sequenceFlows,childNodeMap,process));
+//                            }
+//
+//                            //  针对 gateway 空任务分支 添加条件表达式
+//                            if (!branchConditions.isEmpty()) {
+//                                FlowElement flowElement1 = bpmnModel.getFlowElement(endExId);
+//                                // 获取从 gateway 到目标节点 未设置条件表达式的节点
+//                                List<SequenceFlow> flows = sequenceFlows.stream().filter(
+//                                                flow -> StringUtils.equals(flowElement1.getId(), flow.getTargetRef()))
+//                                        .filter(
+//                                                flow -> StringUtils.equals(flow.getSourceRef(), exclusiveGatewayId))
+//                                        .collect(Collectors.toList());
+//
+//                                flows.forEach(sequenceFlow -> {
+//                                    if (!condition.isEmpty()) {
+//                                        String nodeName = condition.getString("nodeName");
+//                                        String expression = condition.getString("expression");
+//
+//                                        if (StringUtils.isBlank(sequenceFlow.getName()) && StringUtils
+//                                                .isNotBlank(nodeName)) {
+//                                            sequenceFlow.setName(nodeName);
+//                                        }
+//                                        // 设置条件表达式
+//                                        if (Objects.isNull(sequenceFlow.getConditionExpression())
+//                                                && StringUtils.isNotBlank(expression)) {
+//                                            sequenceFlow.setConditionExpression(expression);
+//                                        }
+//
+//                                        FlowElement flowElement2 = process.getFlowElement(sequenceFlow.getId());
+//                                        if(flowElement2!=null){
+//                                            flowElement2.setId(condition.getString("finalSequenceFlowId"));
+//                                            exclusiveGateway.setDefaultFlow(flowElement2.getId());;
+//                                        }
+//
+//                                        conditions.remove(0);
+//                                    }
+//                                });
+//
+//                            }
+//
+//                            // 1.1 边连接完成后，在进行 nextNode 创建
+//                            if (Objects.nonNull(nextNode) &&StringUtils.isNotBlank(nextNode.getId())) {
+//                                return create(endExId, nextNode, process, bpmnModel, sequenceFlows,
+//                                        childNodeMap);
+//                            } else {
+//                                return endExId;
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//            else{
+//                System.err.println("-");
+//            }
+//        }
+        return incoming;
     }
 
     public static ExclusiveGateway createExclusiveGateWayEnd(String id){
@@ -490,7 +492,7 @@ public class BpmnModelUtils {
      * @throws InvocationTargetException
      * @throws IllegalAccessException
      */
-    private static String createParallelGatewayBuilder(String formId, ChildNode flowNode,Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
+    private static List<String> createParallelGatewayBuilder(String formId, ChildNode flowNode,Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
         childNodeMap.put(flowNode.getId(),flowNode);
         String name = flowNode.getName();
         String parallelGatewayId = flowNode.getId();
@@ -504,7 +506,7 @@ public class BpmnModelUtils {
         process.addFlowElement(connect(formId, parallelGatewayId,sequenceFlows,childNodeMap,process)); // 新增连线
 
         if (Objects.isNull(flowNode.getBranchs()) && Objects.isNull(flowNode.getChildren())) { // 没有分支/子项：返回并行网关ID
-            return parallelGatewayId;
+            return Arrays.asList(parallelGatewayId);
         }
 
         List<ChildNode> flowNodes = flowNode.getBranchs();
@@ -516,10 +518,7 @@ public class BpmnModelUtils {
                 incoming.add(parallelGatewayId);
                 continue;
             }
-            String identifier = create(parallelGatewayId, childNode,process,bpmnModel,sequenceFlows,childNodeMap);
-            if (Objects.nonNull(identifier)) {
-                incoming.add(identifier);
-            }
+            incoming.addAll(create(parallelGatewayId, childNode,process,bpmnModel,sequenceFlows,childNodeMap));
         }
 
         ChildNode childNode = flowNode.getChildren();
@@ -527,7 +526,7 @@ public class BpmnModelUtils {
             String parentId = childNode.getParentId();
             ChildNode parentChildNode = childNodeMap.get(parentId);
             boolean conFlag = Type.CONCURRENTS.type
-                .equals(parentChildNode.getType());
+                    .equals(parentChildNode.getType());
             if(!conFlag){
                 String type = childNode.getType();
                 if(!Type.EMPTY.type.equals(type)){
@@ -558,7 +557,7 @@ public class BpmnModelUtils {
                             if (Objects.nonNull(nextNode)&&StringUtils.isNotBlank(nextNode.getId())) {
                                 return create(identifier, nextNode,process,bpmnModel,sequenceFlows,childNodeMap);
                             } else {
-                                return identifier;
+                                return Arrays.asList(identifier);
                             }
                         }
                     }
@@ -594,7 +593,7 @@ public class BpmnModelUtils {
                             if (Objects.nonNull(nextNode) &&StringUtils.isNotBlank(nextNode.getId())) {
                                 return create(identifier, nextNode,process,bpmnModel,sequenceFlows,childNodeMap);
                             } else {
-                                return identifier;
+                                return Arrays.asList(identifier);
                             }
                         }
                     }
@@ -602,7 +601,7 @@ public class BpmnModelUtils {
             }
 
         }
-        return parallelGatewayId;
+        return Arrays.asList(parallelGatewayId);
     }
 
     /**
