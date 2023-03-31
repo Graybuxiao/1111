@@ -36,6 +36,8 @@ import static org.flowable.bpmn.model.ImplementationType.IMPLEMENTATION_TYPE_DEL
  * @create 2022-10-10 17:47
  */
 public class BpmnModelUtils {
+    /** 触发器所需依附的UserTask ID*/
+    private static String TRIGGE_RPARENTID = "";
 
     private static String id(String prefix) {
         return prefix + "_" + UUID.randomUUID().toString().replace("-", "").toLowerCase();
@@ -272,7 +274,29 @@ public class BpmnModelUtils {
 //            }
         }
         else if(Type.TRIGGER.isEqual(nodeType)){
-            throw new WorkFlowException("还不想写这个功能");
+            String parentId = flowNode.getParentId();
+            FlowElement flowElement = bpmnModel.getMainProcess().getFlowElement(parentId);
+            UserTask userTask = (UserTask)flowElement;
+            if (userTask != null) {
+                List<FlowableListener> taskListeners = userTask.getTaskListeners();
+                FlowableListener activitiListener = new FlowableListener();
+                activitiListener.setEvent(TaskListener.EVENTNAME_CREATE);
+                activitiListener.setImplementationType(IMPLEMENTATION_TYPE_DELEGATEEXPRESSION);
+                activitiListener.setImplementation("${triggerListener}");
+                taskListeners.add(activitiListener);
+                userTask.setTaskListeners(taskListeners);
+                BpmnModelUtils.TRIGGE_RPARENTID = parentId;
+            }
+            childNodeMap.put(flowNode.getId(),flowNode);
+            JSONObject incoming = flowNode.getIncoming();
+            incoming.put("incoming", Collections.singletonList(fromId));
+            // 如果当前任务还有后续任务，则遍历创建后续任务
+            ChildNode children = flowNode.getChildren();
+            if (Objects.nonNull(children) &&StringUtils.isNotBlank(children.getId())) {
+                return create(BpmnModelUtils.TRIGGE_RPARENTID, children,process,bpmnModel,sequenceFlows,childNodeMap);
+            } else {
+                return BpmnModelUtils.TRIGGE_RPARENTID;
+            }
         }
         else if(Type.CC.isEqual(nodeType)){
             throw new WorkFlowException("代码呗回滚了 丢了,暂时先不做");
