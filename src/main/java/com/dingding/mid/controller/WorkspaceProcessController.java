@@ -30,29 +30,22 @@ import io.minio.http.Method;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import liquibase.pro.packaged.S;
 import org.apache.commons.lang3.StringUtils;
-import org.flowable.bpmn.model.BpmnModel;
-import org.flowable.bpmn.model.FlowElement;
-import org.flowable.bpmn.model.Process;
-import org.flowable.common.engine.impl.identity.Authentication;
-import org.flowable.engine.HistoryService;
-import org.flowable.engine.RepositoryService;
-import org.flowable.engine.RuntimeService;
-import org.flowable.engine.TaskService;
-import org.flowable.engine.history.HistoricActivityInstance;
-import org.flowable.engine.history.HistoricProcessInstance;
-import org.flowable.engine.impl.persistence.entity.ExecutionEntity;
-import org.flowable.engine.repository.ProcessDefinition;
-import org.flowable.engine.runtime.ActivityInstance;
-import org.flowable.engine.runtime.Execution;
-import org.flowable.engine.runtime.ProcessInstance;
-import org.flowable.engine.runtime.ProcessInstanceBuilder;
-import org.flowable.engine.task.Attachment;
-import org.flowable.engine.task.Comment;
-import org.flowable.task.api.DelegationState;
-import org.flowable.task.api.Task;
-import org.flowable.task.api.history.HistoricTaskInstance;
+import org.camunda.bpm.engine.*;
+import org.camunda.bpm.engine.history.HistoricActivityInstance;
+import org.camunda.bpm.engine.history.HistoricProcessInstance;
+import org.camunda.bpm.engine.history.HistoricTaskInstance;
+import org.camunda.bpm.engine.history.HistoricVariableInstance;
+import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
+import org.camunda.bpm.engine.repository.ProcessDefinition;
+import org.camunda.bpm.engine.runtime.ActivityInstance;
+import org.camunda.bpm.engine.runtime.ProcessInstance;
+import org.camunda.bpm.engine.task.Attachment;
+import org.camunda.bpm.engine.task.Comment;
+import org.camunda.bpm.engine.task.DelegationState;
+import org.camunda.bpm.engine.task.Task;
+import org.camunda.bpm.model.bpmn.instance.FlowElement;
+import org.camunda.bpm.model.bpmn.instance.FlowNode;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -68,6 +61,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.dingding.mid.common.CommonConstants.*;
+import static com.dingding.mid.common.WorkFlowConstants.COMMENT_SPLIT;
 import static com.dingding.mid.common.WorkFlowConstants.PROCESS_PREFIX;
 import static com.dingding.mid.utils.BpmnModelUtils.getChildNode;
 
@@ -79,6 +73,7 @@ import static com.dingding.mid.utils.BpmnModelUtils.getChildNode;
 @RequestMapping("/workspace")
 @Api(tags = {"Vue2版本 的数据列表,待办,已办,我发起等接口"})
 @ApiSort(3)
+@SuppressWarnings("all")
 public class WorkspaceProcessController {
 
     @Resource
@@ -93,6 +88,8 @@ public class WorkspaceProcessController {
     private TaskService taskService;
     @Resource
     private UserService userService;
+    @Resource
+    private IdentityService identityService;
 
     @ApiOperation("通过模板id查看流程信息 会附带流程定义id")
     @ApiOperationSupport(order = 1)
@@ -119,10 +116,11 @@ public class WorkspaceProcessController {
         try{
             JSONObject formData = startProcessInstanceDTO.getFormData();
             UserInfo startUserInfo = startProcessInstanceDTO.getStartUserInfo();
-            Authentication.setAuthenticatedUserId(startUserInfo.getId());
+            identityService.setAuthenticatedUserId(startUserInfo.getId());
             Map<String,Object> processVariables= new HashMap<>();
             processVariables.put(FORM_VAR,formData);
             processVariables.put(PROCESS_STATUS,BUSINESS_STATUS_1);
+            processVariables.put(APPLY_USER_ID,startUserInfo.getId());
             processVariables.put(START_USER_INFO,JSONObject.toJSONString(startUserInfo));
             ArrayList<UserInfo> userInfos = CollUtil.newArrayList(startUserInfo);
             processVariables.put("root",JSONObject.toJSONString(userInfos));
@@ -142,12 +140,7 @@ public class WorkspaceProcessController {
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
             });
             processVariables.putAll(formValue);
-            ProcessInstanceBuilder processInstanceBuilder = runtimeService.createProcessInstanceBuilder();
-            ProcessInstance processInstance = processInstanceBuilder
-                    .processDefinitionId(startProcessInstanceDTO.getProcessDefinitionId())
-                    .variables(processVariables)
-                    .businessStatus(BUSINESS_STATUS_1)
-                    .start();
+            ProcessInstance processInstance = runtimeService.startProcessInstanceById(startProcessInstanceDTO.getProcessDefinitionId(), processVariables);
             //手动完成第一个任务
             Task task = taskService.createTaskQuery().processInstanceId(processInstance.getId()).singleResult();
             if(task!=null){
@@ -166,6 +159,14 @@ public class WorkspaceProcessController {
         }
     }
 
+    public Map<String,Object> getVariables(String processInstanceId){
+        Map<String,Object> processVariables= new HashMap<>();
+        List<HistoricVariableInstance> list = historyService.createHistoricVariableInstanceQuery().processInstanceId(processInstanceId).list();
+        for (HistoricVariableInstance historicVariableInstance : list) {
+            processVariables.put(historicVariableInstance.getName(),historicVariableInstance.getValue());
+        }
+        return processVariables;
+    }
 
     @ApiOperation("查看我发起的流程")
     @ApiOperationSupport(order = 3)
@@ -173,15 +174,14 @@ public class WorkspaceProcessController {
     public Result< Page<HistoryProcessInstanceVO>> applyList(@RequestBody ApplyDTO applyDTO){
         List<HistoricProcessInstance> historicProcessInstances =
                 historyService.createHistoricProcessInstanceQuery()
-                .includeProcessVariables()
-                .startedBy(applyDTO.getCurrentUserInfo().getId())
-                .orderByProcessInstanceStartTime().desc()
-                .listPage((applyDTO.getPageNo() - 1) * applyDTO.getPageSize(), applyDTO.getPageSize());
+                        .startedBy(applyDTO.getCurrentUserInfo().getId())
+                        .orderByProcessInstanceStartTime().desc()
+                        .listPage((applyDTO.getPageNo() - 1) * applyDTO.getPageSize(), applyDTO.getPageSize());
         long count = historyService.createHistoricProcessInstanceQuery()
                 .startedBy(applyDTO.getCurrentUserInfo().getId()).count();
         List<String> applyUserIds= new ArrayList<>();
         for (HistoricProcessInstance historicProcessInstance : historicProcessInstances) {
-            Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
+            Map<String, Object> processVariables = getVariables(historicProcessInstance.getId());
             String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
             }).getId();
             applyUserIds.add(id);
@@ -197,7 +197,7 @@ public class WorkspaceProcessController {
         List<HistoryProcessInstanceVO> historyProcessInstanceVOS= new ArrayList<>();
         Page<HistoryProcessInstanceVO> page=new Page<>();
         for (HistoricProcessInstance historicProcessInstance : historicProcessInstances) {
-            Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
+            Map<String, Object> processVariables = getVariables(historicProcessInstance.getId());
             HistoryProcessInstanceVO historyProcessInstanceVO=new HistoryProcessInstanceVO();
             historyProcessInstanceVO.setProcessInstanceId(historicProcessInstance.getId());
             historyProcessInstanceVO.setProcessDefinitionName(historicProcessInstance.getProcessDefinitionName());
@@ -231,19 +231,20 @@ public class WorkspaceProcessController {
     }
 
 
+
+
+
     private   String getCurrentName(String processInstanceId,Boolean flag,String processDefinitionId){
         if(flag){
             return "流程已结束";
         }
-        List<ActivityInstance> list = runtimeService.createActivityInstanceQuery().processInstanceId(processInstanceId).activityType("userTask").unfinished().orderByActivityInstanceStartTime().desc().list();
+        List<HistoricActivityInstance> list = historyService.createHistoricActivityInstanceQuery().processInstanceId(processInstanceId).activityType("userTask").finished().orderByHistoricActivityInstanceStartTime().desc().list();
         if(CollUtil.isEmpty(list)){
             return "";
         }
         else{
-            String activityId = list.get(0).getActivityId();
-            BpmnModel bpmnModel = repositoryService.getBpmnModel(processDefinitionId);
-            FlowElement flowElement = bpmnModel.getMainProcess().getFlowElement(activityId);
-            return flowElement.getName();
+            HistoricActivityInstance historicActivityInstance = list.get(0);
+            return historicActivityInstance.getActivityName();
         }
     }
 
@@ -251,7 +252,6 @@ public class WorkspaceProcessController {
     @PostMapping("process/toDoList")
     public Result<Page<TaskVO>> toDoList(@RequestBody TaskDTO taskDTO){
         List<Task> tasks = taskService.createTaskQuery().taskAssignee(taskDTO.getCurrentUserInfo().getId())
-                .includeProcessVariables()
                 .orderByTaskCreateTime().desc()
                 .listPage((taskDTO.getPageNo() - 1) * taskDTO.getPageSize(), taskDTO.getPageSize());
         long count = taskService.createTaskQuery().taskAssignee(taskDTO.getCurrentUserInfo().getId()).count();
@@ -261,7 +261,7 @@ public class WorkspaceProcessController {
 
         List<String> taskIds= new ArrayList<>();
         for (Task task : tasks) {
-            Map<String, Object> processVariables = task.getProcessVariables();
+            Map<String, Object> processVariables = getVariables(task.getProcessInstanceId());
             String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
             }).getId();
             taskIds.add(id);
@@ -277,13 +277,13 @@ public class WorkspaceProcessController {
         }
 
         for (Task task : tasks) {
-            ProcessInstance processInstance = runtimeService.createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
-            BpmnModel bpmnModel = repositoryService.getBpmnModel(task.getProcessDefinitionId());
-            Map<String, Object> processVariables = task.getProcessVariables();
+            HistoricProcessInstance processInstance = historyService.createHistoricProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
+            String name = repositoryService.createProcessDefinitionQuery().processDefinitionId(processInstance.getProcessDefinitionId()).singleResult().getName();
+            Map<String, Object> processVariables = getVariables(task.getProcessInstanceId());
             TaskVO taskVO=new TaskVO();
             taskVO.setTaskId(task.getId());
             taskVO.setProcessInstanceId(task.getProcessInstanceId());
-            taskVO.setProcessDefinitionName(bpmnModel.getMainProcess().getName());
+            taskVO.setProcessDefinitionName(name);
             taskVO.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
             taskVO.setUsers(collect.get(Long.valueOf(taskVO.getStartUser().getId())));
             taskVO.setStartTime(processInstance.getStartTime());
@@ -311,8 +311,7 @@ public class WorkspaceProcessController {
         List<HistoricTaskInstance> tasks = historyService.createHistoricTaskInstanceQuery()
                 .taskAssignee(taskDTO.getCurrentUserInfo().getId())
                 .finished()
-                .includeProcessVariables()
-                .orderByTaskCreateTime().desc()
+                .orderByHistoricActivityInstanceStartTime().desc()
                 .listPage((taskDTO.getPageNo() - 1) * taskDTO.getPageSize(), taskDTO.getPageSize());
         long count = historyService.createHistoricTaskInstanceQuery()
                 .taskAssignee(taskDTO.getCurrentUserInfo().getId()).finished().count();
@@ -321,7 +320,7 @@ public class WorkspaceProcessController {
 
         List<String> taskIds= new ArrayList<>();
         for (HistoricTaskInstance task : tasks) {
-            Map<String, Object> processVariables = task.getProcessVariables();
+            Map<String, Object> processVariables = getVariables(task.getProcessInstanceId());
             String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
             }).getId();
             taskIds.add(id);
@@ -340,13 +339,13 @@ public class WorkspaceProcessController {
         for (HistoricTaskInstance task : tasks) {
             HistoricProcessInstance historicProcessInstance = historyService.createHistoricProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
             Boolean flag=historicProcessInstance.getEndTime()==null?false:true;
-            BpmnModel bpmnModel = repositoryService.getBpmnModel(task.getProcessDefinitionId());
-            Map<String, Object> processVariables = task.getProcessVariables();
+            String name = repositoryService.createProcessDefinitionQuery().processDefinitionId(task.getProcessDefinitionId()).singleResult().getName();
+            Map<String, Object> processVariables = getVariables(task.getProcessInstanceId());
             TaskVO taskVO=new TaskVO();
             taskVO.setTaskId(task.getId());
             taskVO.setTaskName(task.getName());
             taskVO.setProcessInstanceId(task.getProcessInstanceId());
-            taskVO.setProcessDefinitionName(bpmnModel.getMainProcess().getName());
+            taskVO.setProcessDefinitionName(name);
             taskVO.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
             taskVO.setUsers(collect.get(Long.valueOf(taskVO.getStartUser().getId())));
             taskVO.setStartTime(historicProcessInstance.getStartTime());
@@ -374,6 +373,8 @@ public class WorkspaceProcessController {
         return Result.OK(page);
     }
 
+
+
     @ApiOperation("同意按钮")
     @PostMapping("/agree")
     public Result agree(@RequestBody HandleDataDTO handleDataDTO,MultipartFile file){
@@ -392,9 +393,9 @@ public class WorkspaceProcessController {
         }
 
         runtimeService.setVariables(task.getProcessInstanceId(),map);
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -403,7 +404,7 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
 
 
@@ -429,9 +430,9 @@ public class WorkspaceProcessController {
         }
 
         runtimeService.setVariables(task.getProcessInstanceId(),map);
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -440,7 +441,7 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
 
         UserInfo delegateUserInfo = handleDataDTO.getDelegateUserInfo();
@@ -466,9 +467,9 @@ public class WorkspaceProcessController {
         }
 
         runtimeService.setVariables(task.getProcessInstanceId(),map);
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -477,7 +478,7 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
 
         taskService.resolveTask(taskId);
@@ -489,7 +490,7 @@ public class WorkspaceProcessController {
     @PostMapping("/refuse")
     public Result refuse(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
@@ -505,7 +506,7 @@ public class WorkspaceProcessController {
         map.put(PROCESS_STATUS,BUSINESS_STATUS_3);
         runtimeService.setVariables(task.getProcessInstanceId(),map);
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -514,7 +515,7 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
         runtimeService.deleteProcessInstance(task.getProcessInstanceId(),"拒绝");
         return Result.OK();
@@ -524,7 +525,7 @@ public class WorkspaceProcessController {
     @PostMapping("/revoke")
     public Result revoke(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
@@ -540,7 +541,7 @@ public class WorkspaceProcessController {
         map.put(PROCESS_STATUS,BUSINESS_STATUS_2);
         runtimeService.setVariables(task.getProcessInstanceId(),map);
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -549,7 +550,7 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
         runtimeService.deleteProcessInstance(task.getProcessInstanceId(),"撤销");
         return Result.OK();
@@ -560,7 +561,7 @@ public class WorkspaceProcessController {
     @PostMapping("/assignee")
     public Result assignee(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
@@ -576,7 +577,7 @@ public class WorkspaceProcessController {
         map.put(PROCESS_STATUS,BUSINESS_STATUS_1);
         runtimeService.setVariables(task.getProcessInstanceId(),map);
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -585,7 +586,7 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
         taskService.setAssignee(taskId,handleDataDTO.getTransferUserInfo().getId());
         return Result.OK();
@@ -593,9 +594,9 @@ public class WorkspaceProcessController {
     @ApiOperation("查询可退回的节点(这个是给 下面 rollback接口作为入参用的 )")
     @PostMapping("/rollbackNodes")
     public Result rollbackNodes(@RequestBody HandleDataDTO handleDataDTO){
-        List<ActivityInstance> list = runtimeService.createActivityInstanceQuery().unfinished().processInstanceId(handleDataDTO.getProcessInstanceId()).list();
+        List<HistoricActivityInstance> list = historyService.createHistoricActivityInstanceQuery().finished().processInstanceId(handleDataDTO.getProcessInstanceId()).list();
         Map<String,String> nodes=new HashMap<>();
-        for (ActivityInstance activityInstance : list) {
+        for (HistoricActivityInstance activityInstance : list) {
             nodes.put(activityInstance.getActivityId(),activityInstance.getActivityName());
         }
         return Result.OK(nodes);
@@ -605,7 +606,7 @@ public class WorkspaceProcessController {
     @PostMapping("/rollback")
     public Result rollback(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
@@ -634,7 +635,7 @@ public class WorkspaceProcessController {
         map.put(PROCESS_STATUS,BUSINESS_STATUS_3);
         runtimeService.setVariables(task.getProcessInstanceId(),map);
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -643,14 +644,14 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
 
 
-        runtimeService.createChangeActivityStateBuilder()
-                .processInstanceId(task.getProcessInstanceId())
-                .moveActivityIdsToSingleActivityId(taskIds,handleDataDTO.getRollbackId())
-                .changeState();
+//        runtimeService.createChangeActivityStateBuilder()
+//                .processInstanceId(task.getProcessInstanceId())
+//                .moveActivityIdsToSingleActivityId(taskIds,handleDataDTO.getRollbackId())
+//                .changeState();
         return Result.OK();
     }
 
@@ -659,7 +660,7 @@ public class WorkspaceProcessController {
     @PostMapping("/addMulti")
     public Result addMulti(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
@@ -675,7 +676,7 @@ public class WorkspaceProcessController {
         map.put(PROCESS_STATUS,BUSINESS_STATUS_1);
         runtimeService.setVariables(task.getProcessInstanceId(),map);
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -684,12 +685,14 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
 
         Map<String,Object> variableMap= new HashMap<>();
         variableMap.put("assigneeName",handleDataDTO.getMultiAddUserInfo().getId());
-        ExecutionEntity execution = (ExecutionEntity) runtimeService.addMultiInstanceExecution(task.getTaskDefinitionKey(), task.getProcessInstanceId(), variableMap);
+        runtimeService.createProcessInstanceModification(task.getProcessInstanceId())
+                .startBeforeActivity(task.getTaskDefinitionKey())
+                .execute();
         return Result.OK();
     }
 
@@ -722,9 +725,9 @@ public class WorkspaceProcessController {
     @ApiOperation("减签按钮")
     @PostMapping("/deleteMulti")
     public Result deleteMulti(@RequestBody List<String> executionIds){
-        for (String executionId : executionIds) {
-            runtimeService.deleteMultiInstanceExecution(executionId,true);
-        }
+//        for (String executionId : executionIds) {
+//            runtimeService.deleteMultiInstanceExecution(executionId,true);
+//        }
         return Result.OK();
     }
 
@@ -733,7 +736,7 @@ public class WorkspaceProcessController {
     @PostMapping("/comments")
     public Result comments(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        identityService.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
@@ -749,7 +752,7 @@ public class WorkspaceProcessController {
         map.put(PROCESS_STATUS,BUSINESS_STATUS_1);
         runtimeService.setVariables(task.getProcessInstanceId(),map);
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"comments",comments);
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"comments"+COMMENT_SPLIT+comments);
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
@@ -758,7 +761,7 @@ public class WorkspaceProcessController {
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
         return Result.OK();
     }
@@ -768,7 +771,7 @@ public class WorkspaceProcessController {
     public Result<HandleDataVO> instanceInfo(@RequestBody HandleDataDTO HandleDataDTO){
         String processInstanceId = HandleDataDTO.getProcessInstanceId();
         HistoricProcessInstance historicProcessInstance = historyService.createHistoricProcessInstanceQuery().processInstanceId(processInstanceId)
-                .includeProcessVariables().singleResult();
+                .singleResult();
         String processDefinitionKey = historicProcessInstance.getProcessDefinitionKey();
         ProcessTemplates processTemplates = processTemplateService.getById(processDefinitionKey.replace(PROCESS_PREFIX,""));
         processTemplates.setLogo(processTemplates.getIcon());
@@ -777,7 +780,7 @@ public class WorkspaceProcessController {
         processTemplates.setProcessDefinitionId(historicProcessInstance.getProcessDefinitionId());
 
         HandleDataVO handleDataVO =new HandleDataVO();
-        Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
+        Map<String, Object> processVariables = getVariables(processInstanceId);
 
         handleDataVO.setProcessInstanceId(historicProcessInstance.getId());
         JSONObject jsonObject = (JSONObject) processVariables.get(FORM_VAR);
@@ -796,7 +799,7 @@ public class WorkspaceProcessController {
                 while (iterator.hasNext()){
                     FormOperates next = iterator.next();
                     if("H".equals(next.getPerm())){
-//                        iterator.remove();
+                        iterator.remove();
                         if(jsonObject!=null){
                             jsonObject.remove(next.getId());
                         }
@@ -810,7 +813,6 @@ public class WorkspaceProcessController {
         if(sign){
             handleDataVO.setSignFlag(true);
         }
-        else{
         if(StringUtils.isNotBlank(HandleDataDTO.getTaskId())){
             if(currentNode!=null){
                 if(currentNode.getProps().getSign()){
@@ -820,10 +822,6 @@ public class WorkspaceProcessController {
                     handleDataVO.setSignFlag(false);
                 }
             }
-        }
-        else {
-            handleDataVO.setSignFlag(false);
-        }
         }
 
 
@@ -843,10 +841,7 @@ public class WorkspaceProcessController {
                 historicActivityInstanceMap.put(historicActivityInstance.getActivityId(),historicActivityInstances);
             }
         }
-
-        Process mainProcess = repositoryService.getBpmnModel(historicProcessInstance.getProcessDefinitionId()).getMainProcess();
-        Collection<FlowElement> flowElements = mainProcess.getFlowElements();
-
+        Collection<FlowNode> flowElements = repositoryService.getBpmnModelInstance(historicProcessInstance.getProcessDefinitionId()).getModelElementsByType(FlowNode.class);
         List<String> runningList= new ArrayList<>();
         handleDataVO.setRunningList(runningList);
         List<String> endList=new ArrayList<>();
@@ -936,7 +931,7 @@ public class WorkspaceProcessController {
             taskDetailVO.setName(activityInstance.getActivityName());
             taskDetailVO.setCreateTime(activityInstance.getStartTime());
             taskDetailVO.setEndTime(activityInstance.getEndTime());
-            Comment signComment = processInstanceComments.stream().filter(h -> h.getTaskId().equals(historicActivityInstance.getTaskId()) && h.getType().equals("sign")).findFirst().orElse(null);
+            Comment signComment = processInstanceComments.stream().filter(h -> h.getTaskId().equals(historicActivityInstance.getTaskId()) && h.getFullMessage().split(COMMENT_SPLIT)[0].equals("sign")).findFirst().orElse(null);
             if(signComment!=null){
                 taskDetailVO.setSignImage(signComment.getFullMessage());
             }
@@ -953,7 +948,7 @@ public class WorkspaceProcessController {
                 taskDetailVO.setAttachmentVOList(attachmentVOList);
             }
 
-            List<Comment> options = processInstanceComments.stream().filter(h -> h.getTaskId().equals(historicActivityInstance.getTaskId()) && h.getType().equals("opinion")).collect(Collectors.toList());
+            List<Comment> options = processInstanceComments.stream().filter(h -> h.getTaskId().equals(historicActivityInstance.getTaskId()) && h.getFullMessage().split(COMMENT_SPLIT)[0].equals("opinion")).collect(Collectors.toList());
             if(CollUtil.isNotEmpty(options)){
                 List<OptionVO> optionVOList =new ArrayList<>();
                 for (Comment option : options) {
@@ -967,7 +962,7 @@ public class WorkspaceProcessController {
                 taskDetailVO.setOptionVOList(optionVOList);
             }
 
-            List<Comment> comments = processInstanceComments.stream().filter(h -> h.getTaskId().equals(historicActivityInstance.getTaskId()) && h.getType().equals("comments")).collect(Collectors.toList());
+            List<Comment> comments = processInstanceComments.stream().filter(h -> h.getTaskId().equals(historicActivityInstance.getTaskId()) && h.getFullMessage().split(COMMENT_SPLIT)[0].equals("comments")).collect(Collectors.toList());
             if(CollUtil.isNotEmpty(comments)){
                 List<CommentVO> commentsVOList =new ArrayList<>();
                 for (Comment comment : comments) {
@@ -1036,3 +1031,1230 @@ public class WorkspaceProcessController {
     }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

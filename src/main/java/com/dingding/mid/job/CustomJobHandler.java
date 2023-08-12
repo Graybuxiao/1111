@@ -2,10 +2,12 @@ package com.dingding.mid.job;
 
 import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
-import org.flowable.common.engine.impl.interceptor.CommandContext;
-import org.flowable.job.service.JobHandler;
-import org.flowable.job.service.impl.persistence.entity.JobEntity;
-import org.flowable.variable.api.delegate.VariableScope;
+import org.camunda.bpm.engine.delegate.VariableScope;
+import org.camunda.bpm.engine.impl.interceptor.CommandContext;
+import org.camunda.bpm.engine.impl.jobexecutor.JobHandler;
+import org.camunda.bpm.engine.impl.jobexecutor.JobHandlerConfiguration;
+import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
+import org.camunda.bpm.engine.impl.persistence.entity.JobEntity;
 
 /**
  * @author LoveMyOrange
@@ -20,8 +22,18 @@ public class CustomJobHandler  implements JobHandler {
     }
 
     @Override
-    public void execute(JobEntity jobEntity, String s, VariableScope variableScope, CommandContext commandContext) {
-        log.info("============执行自定义定时任务============");
-        log.info("定时任务详情={}", JSON.toJSONString(jobEntity));
+    public void execute(JobHandlerConfiguration configuration, ExecutionEntity execution, CommandContext commandContext, String tenantId) {
+
     }
+
+    @Override
+    public JobHandlerConfiguration newConfiguration(String canonicalString) {
+        return null;
+    }
+
+    @Override
+    public void onDelete(JobHandlerConfiguration configuration, JobEntity jobEntity) {
+
+    }
+
 }

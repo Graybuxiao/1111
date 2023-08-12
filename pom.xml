@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.fight</groupId>
-  <artifactId>dingding-mid</artifactId>
+  <artifactId>dingding-mid-camunda</artifactId>
   <version>1.0-RELEASE</version>
 
   <properties>
@@ -62,6 +62,7 @@
     <yozosign.version>3.0.1</yozosign.version>
     <flowable.version>6.7.2</flowable.version>
     <knife4j.version>4.1.0</knife4j.version>
+    <camunda.spring-boot.version>7.19.0</camunda.spring-boot.version>
   </properties>
 
   <dependencyManagement>
@@ -364,55 +365,10 @@
     </dependency>
 
 
-    <!-- flowable -->
     <dependency>
-      <groupId>org.flowable</groupId>
-      <artifactId>flowable-spring-boot-starter</artifactId>
-      <version>${flowable.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.flowable</groupId>
-          <artifactId>flowable-spring-boot-starter-app</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.flowable</groupId>
-          <artifactId>flowable-form-spring-configurator</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.flowable</groupId>
-          <artifactId>flowable-idm-spring-configurator</artifactId>
-        </exclusion>
-        <exclusion>
-          <artifactId>mybatis</artifactId>
-          <groupId>org.mybatis</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.flowable</groupId>
-      <artifactId>flowable-bpmn-model</artifactId>
-      <version>${flowable.version}</version>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.flowable</groupId>
-      <artifactId>flowable-json-converter</artifactId>
-      <version>${flowable.version}</version>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.flowable</groupId>
-      <artifactId>flowable-bpmn-converter</artifactId>
-      <version>${flowable.version}</version>
-      <scope>compile</scope>
-    </dependency>
-
-    <!--activiti modeler 5.22 end-->
-    <!-- 自动布局jar 包-->
-    <dependency>
-      <groupId>org.flowable</groupId>
-      <artifactId>flowable-bpmn-layout</artifactId>
-      <version>${flowable.version}</version>
+      <groupId>org.camunda.bpm.springboot</groupId>
+      <artifactId>camunda-bpm-spring-boot-starter</artifactId>
+      <version>${camunda.spring-boot.version}</version>
     </dependency>
 
 

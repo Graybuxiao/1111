@@ -12,6 +12,8 @@ public interface CommonConstants {
 	String FORM_VAR="formData";
 	String PROCESS_STATUS="processStatus";
 	String START_USER_INFO="startUser";
+	String APPLY_USER_ID="applyUserId";
+
 	String BUSINESS_STATUS_1="1"; //正在处理
 	String BUSINESS_STATUS_2="2";//撤销
 	String BUSINESS_STATUS_3="3";//驳回

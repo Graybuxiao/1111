@@ -1,19 +1,25 @@
 package com.dingding.mid.utils;
 
+import cn.hutool.core.codec.Base64;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.NumberUtil;
+import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
 import com.dingding.mid.dto.json.UserInfo;
-import org.apache.commons.lang3.StringUtils;
-import org.flowable.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.RepositoryService;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.impl.javax.el.ExpressionFactory;
+import org.camunda.bpm.engine.impl.javax.el.ValueExpression;
+import org.camunda.bpm.engine.impl.juel.ExpressionFactoryImpl;
+import org.camunda.bpm.engine.impl.juel.SimpleContext;
+import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.nio.charset.Charset;
+import java.util.*;
 
 /**
  * @author LoveMyOrange
@@ -21,6 +27,7 @@ import java.util.List;
  */
 @Component
 public class ExUtils {
+
     public Boolean strEqualsMethod(String controlId,String value){
         List<String> list = Arrays.asList(value);
             String s = list.get(0);
@@ -54,27 +61,6 @@ public class ExUtils {
     }
 
 
-    public Boolean userStrContainsMethod(String controlId, String fromText, DelegateExecution execution){
-        String variable = (String) execution.getVariable(controlId);
-        if(StringUtils.isBlank(variable)){
-            return Boolean.FALSE;
-        }
-
-        List<UserInfo> userInfos = JSONObject.parseObject(variable, new TypeReference<List<UserInfo>>() {
-        });
-        List<String> idsList= new ArrayList<>();
-        for (UserInfo userInfo : userInfos) {
-            idsList.add(userInfo.getId());
-        }
-        String[] split = fromText.split(",");
-        List<String> strings = Arrays.asList(split);
-        Collection<String> intersection = CollUtil.intersection(strings, idsList);
-        if(CollUtil.isEmpty(intersection)){
-            return Boolean.FALSE;
-        }
-        return Boolean.TRUE;
-    }
-
     public Boolean userStrContainsMethod(String controlId,String...values){
         List<String> strings = Arrays.asList(values);
         List<UserInfo> userInfos = JSONObject.parseObject(controlId, new TypeReference<List<UserInfo>>() {
@@ -90,28 +76,20 @@ public class ExUtils {
         return Boolean.TRUE;
     }
 
-    public Boolean deptStrContainsMethod(String controlId,String fromText,DelegateExecution execution){
-        String variable = (String) execution.getVariable(controlId);
-        if(StringUtils.isBlank(variable)){
-            return Boolean.FALSE;
-        }
-
-        List<UserInfo> userInfos = JSONObject.parseObject(variable, new TypeReference<List<UserInfo>>() {
+    public Boolean deptStrContainsMethod(String controlId,String...values){
+        List<String> strings = Arrays.asList(values);
+        List<UserInfo> userInfos = JSONObject.parseObject(controlId, new TypeReference<List<UserInfo>>() {
         });
         List<String> idsList= new ArrayList<>();
         for (UserInfo userInfo : userInfos) {
             idsList.add(userInfo.getId());
         }
-        String[] split = fromText.split(",");
-        List<String> strings = Arrays.asList(split);
         Collection<String> intersection = CollUtil.intersection(strings, idsList);
         if(CollUtil.isEmpty(intersection)){
             return Boolean.FALSE;
         }
         return Boolean.TRUE;
     }
-
-
 
     public Boolean numberContains(Number controlId,Number...values){
         List<Number> list = Arrays.asList(values);

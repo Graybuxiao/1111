@@ -37,5 +37,6 @@ public class ChildNode {
   private String parallelStr;
   private JSONObject incoming=new JSONObject();
   private Boolean typeElse;
+  private JSONObject config;
 }
 

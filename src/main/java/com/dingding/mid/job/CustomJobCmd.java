@@ -1,12 +1,8 @@
 package com.dingding.mid.job;
 
 import com.alibaba.fastjson.JSONObject;
-import org.flowable.common.engine.impl.interceptor.Command;
-import org.flowable.common.engine.impl.interceptor.CommandContext;
-import org.flowable.engine.impl.util.CommandContextUtil;
-import org.flowable.job.api.Job;
-import org.flowable.job.service.TimerJobService;
-import org.flowable.job.service.impl.persistence.entity.TimerJobEntity;
+import org.camunda.bpm.engine.impl.interceptor.Command;
+import org.camunda.bpm.engine.impl.interceptor.CommandContext;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -38,18 +34,18 @@ public class CustomJobCmd implements Command<Void>, Serializable {
         jsonObject.put("comment", this.comment);
         jsonObject.put("task_id", this.taskId);
 
-        TimerJobService timerJobService = CommandContextUtil.getTimerJobService(commandContext);
-        TimerJobEntity job = timerJobService.createTimerJob();
-        job.setJobType(Job.JOB_TYPE_TIMER);
-        job.setExclusive(true);
-        // 作业处理器类型
-        job.setJobHandlerType(CustomJobHandler.TYPE);
-        // 处理时间
-        job.setDuedate(this.dueDate);
-        job.setExecutionId(null);
-        job.setProcessInstanceId(this.processInstanceId);
-        job.setJobHandlerConfiguration(jsonObject.toJSONString());
-        timerJobService.scheduleTimerJob(job);
+//        TimerJobService timerJobService = CommandContextUtil.getTimerJobService(commandContext);
+//        TimerJobEntity job = timerJobService.createTimerJob();
+//        job.setJobType(Job.JOB_TYPE_TIMER);
+//        job.setExclusive(true);
+//        // 作业处理器类型
+//        job.setJobHandlerType(CustomJobHandler.TYPE);
+//        // 处理时间
+//        job.setDuedate(this.dueDate);
+//        job.setExecutionId(null);
+//        job.setProcessInstanceId(this.processInstanceId);
+//        job.setJobHandlerConfiguration(jsonObject.toJSONString());
+//        timerJobService.scheduleTimerJob(job);
         return null;
     }
 }

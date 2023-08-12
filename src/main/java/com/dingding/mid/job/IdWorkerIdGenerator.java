@@ -2,7 +2,7 @@ package com.dingding.mid.job;
 
 import com.dingding.mid.utils.IdWorker;
 import com.dingding.mid.utils.SpringContextHolder;
-import org.flowable.common.engine.impl.cfg.IdGenerator;
+import org.camunda.bpm.engine.impl.cfg.IdGenerator;
 import org.springframework.stereotype.Component;
 
 /**

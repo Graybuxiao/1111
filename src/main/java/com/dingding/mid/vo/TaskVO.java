@@ -6,7 +6,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
-import org.flowable.task.api.DelegationState;
+import org.camunda.bpm.engine.task.DelegationState;
 
 import java.util.Date;
 

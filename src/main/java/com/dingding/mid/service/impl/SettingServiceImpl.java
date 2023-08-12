@@ -14,33 +14,34 @@ import com.dingding.mid.dto.json.ChildNode;
 import com.dingding.mid.dto.json.FormItem;
 import com.dingding.mid.dto.json.LogoInfo;
 import com.dingding.mid.dto.json.SettingsInfo;
-import com.dingding.mid.entity.FormGroups;
-import com.dingding.mid.entity.ProcessTemplates;
-import com.dingding.mid.entity.TemplateGroup;
-import com.dingding.mid.entity.TemplateGroupBo;
+import com.dingding.mid.entity.*;
 import com.dingding.mid.exception.WorkFlowException;
 import com.dingding.mid.mapper.TemplateGroupMapper;
-import com.dingding.mid.service.FormGroupService;
-import com.dingding.mid.service.ProcessTemplateService;
-import com.dingding.mid.service.SettingService;
-import com.dingding.mid.service.TemplateGroupService;
+import com.dingding.mid.service.*;
 import com.dingding.mid.utils.IdWorker;
 import com.dingding.mid.utils.SpringContextHolder;
 import com.dingding.mid.vo.TemplateGroupVo;
 
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
-import org.flowable.bpmn.BpmnAutoLayout;
-import org.flowable.bpmn.converter.BpmnXMLConverter;
-import org.flowable.bpmn.model.*;
-import org.flowable.bpmn.model.Process;
-import org.flowable.engine.RepositoryService;
-import org.flowable.engine.delegate.ExecutionListener;
-import org.flowable.engine.repository.Deployment;
+import org.camunda.bpm.engine.RepositoryService;
+import org.camunda.bpm.engine.delegate.ExecutionListener;
+import org.camunda.bpm.engine.repository.Deployment;
+import org.camunda.bpm.engine.repository.ProcessDefinition;
+import org.camunda.bpm.model.bpmn.Bpmn;
+import org.camunda.bpm.model.bpmn.BpmnModelInstance;
+import org.camunda.bpm.model.bpmn.builder.AbstractFlowNodeBuilder;
+import org.camunda.bpm.model.bpmn.builder.EndEventBuilder;
+import org.camunda.bpm.model.bpmn.builder.ProcessBuilder;
+import org.camunda.bpm.model.bpmn.builder.StartEventBuilder;
+import org.camunda.bpm.model.bpmn.instance.EndEvent;
+import org.camunda.bpm.model.bpmn.instance.SequenceFlow;
+import org.camunda.bpm.model.bpmn.instance.StartEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,8 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import javax.annotation.Resource;
 
+import static com.dingding.mid.common.WorkFlowConstants.END_EVENT_ID;
+import static com.dingding.mid.common.WorkFlowConstants.START_EVENT_ID;
 import static com.dingding.mid.utils.BpmnModelUtils.*;
 
 /**
@@ -69,6 +72,8 @@ public class SettingServiceImpl implements SettingService {
     private IdWorker idWorker;
     @Resource
     private RepositoryService repositoryService;
+    @Resource
+    private NodeJsonDataService nodeJsonDataService;
 
     /**
      * 查询表单组
@@ -298,13 +303,24 @@ public class SettingServiceImpl implements SettingService {
         JSONObject jsonObject=new JSONObject();
         jsonObject.put("processJson",template.getProcess());
         jsonObject.put("formJson",template.getFormItems());
-        BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, template.getRemark(),
+        BpmnModelInstance bpmnModel = assemBpmnModel(jsonObject, childNode, template.getRemark(),
             template.getFormName(), template.getGroupId(), template.getFormId());
-        repositoryService.createDeployment()
-            .addBpmnModel(template.getFormName() + ".bpmn", bpmnModel)
-            .name(template.getFormName())
-            .category(template.getGroupId() + "")
-            .deploy();
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        Bpmn.writeModelToStream(outputStream, bpmnModel);
+        byte[] bytes = outputStream.toByteArray();
+        System.err.println(new String(bytes));
+        Deployment deployment = repositoryService.createDeployment()
+                .addModelInstance(template.getFormName() + ".bpmn", bpmnModel)
+                .name(template.getFormName())
+//            .category(template.getGroupId() + "")
+                .deploy();
+        ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery().deploymentId(deployment.getId()).singleResult();
+        NodeJsonData nodeJsonData = new NodeJsonData();
+        nodeJsonData.setNodeJsonData(template.getProcess());
+        nodeJsonData.setProcessDefinitionId(processDefinition.getId());
+        nodeJsonDataService.save(nodeJsonData);
+
         return R.ok("发布更新后的表单成功");
     }
     @Transactional(rollbackFor = Exception.class)
@@ -351,40 +367,44 @@ public class SettingServiceImpl implements SettingService {
         JSONObject jsonObject=new JSONObject();
         jsonObject.put("processJson", processJson);
         jsonObject.put("formJson", formItems);
-        BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, remark, formName, groupId,
+        BpmnModelInstance bpmnModel = assemBpmnModel(jsonObject, childNode, remark, formName, groupId,
             templateId);
-        repositoryService.createDeployment()
-            .addBpmnModel(formName + ".bpmn", bpmnModel)
-            .name(formName)
-            .category(groupId + "")
-            .deploy();
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        Bpmn.writeModelToStream(outputStream, bpmnModel);
+        byte[] bytes = outputStream.toByteArray();
+        System.err.println(new String(bytes));
+        Deployment deployment = repositoryService.createDeployment()
+                .addModelInstance(processTemplates.getFormName() + ".bpmn", bpmnModel)
+                .name(processTemplates.getFormName())
+//            .category(template.getGroupId() + "")
+                .deploy();
+        ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery().deploymentId(deployment.getId()).singleResult();
+        NodeJsonData nodeJsonData = new NodeJsonData();
+        nodeJsonData.setNodeJsonData(processTemplates.getProcess());
+        nodeJsonData.setProcessDefinitionId(processDefinition.getId());
+        nodeJsonDataService.save(nodeJsonData);
 
 
     }
 
-    private BpmnModel assemBpmnModel(JSONObject jsonObject, ChildNode childNode, String remark,
-        String formName, Integer groupId, String templateId)
+    private BpmnModelInstance assemBpmnModel(JSONObject jsonObject, ChildNode childNode, String remark,
+                                             String formName, Integer groupId, String templateId)
         {
-        BpmnModel bpmnModel =new BpmnModel();
+        ProcessBuilder process = Bpmn.createExecutableProcess();
         List<SequenceFlow> sequenceFlows = Lists.newArrayList();
         Map<String,ChildNode> childNodeMap=new HashMap<>();
-        bpmnModel.setTargetNamespace(groupId+"");
-        ExtensionAttribute extensionAttribute=new ExtensionAttribute();
-        extensionAttribute.setName("DingDing");
-        extensionAttribute.setNamespace("http://flowable.org/bpmn");
-        extensionAttribute.setValue(jsonObject.toJSONString());
-        Process process =new Process();
-        process.setId(WorkFlowConstants.PROCESS_PREFIX+templateId);
-        process.setName(formName);
-        process.setDocumentation(remark);
-        process.addAttribute(extensionAttribute);
-        bpmnModel.addProcess(process);
 
-        StartEvent startEvent = createStartEvent();
-        process.addFlowElement(startEvent);
+
+        process.id(WorkFlowConstants.PROCESS_PREFIX+templateId);
+        process.name(formName);
+        process.documentation(remark);
+//        process.addAttribute(extensionAttribute);
+//        bpmnModel.addProcess(process);
+
+        StartEventBuilder startEvent = createStartEvent(process);
             String lastNode = null;
             try {
-                lastNode = create(startEvent.getId(), childNode,process,bpmnModel,sequenceFlows,childNodeMap);
+                lastNode = create(startEvent, START_EVENT_ID,childNode,sequenceFlows,childNodeMap);
             } catch (InvocationTargetException e) {
                 e.printStackTrace();
                 throw new WorkFlowException("操作失败");
@@ -392,17 +412,16 @@ public class SettingServiceImpl implements SettingService {
                 e.printStackTrace();
                 throw new WorkFlowException("操作失败");
             }
-            EndEvent endEvent = createEndEvent();
-        process.addFlowElement(endEvent);
-        process.addFlowElement(connect(lastNode, endEvent.getId(),sequenceFlows,childNodeMap,process));
-        List<FlowableListener> executionListeners =new ArrayList<>();
-        FlowableListener flowableListener=new FlowableListener();
-        flowableListener.setEvent(ExecutionListener.EVENTNAME_END);
-        flowableListener.setImplementationType(ImplementationType.IMPLEMENTATION_TYPE_DELEGATEEXPRESSION);
-        flowableListener.setImplementation("${processListener}");
-        executionListeners.add(flowableListener);
-        process.setExecutionListeners(executionListeners);
-        new BpmnAutoLayout(bpmnModel).execute();
-        return bpmnModel;
+
+            AbstractFlowNodeBuilder<?, ?> fromBuilder = moveToNode(startEvent, lastNode);
+            EndEventBuilder endEventBuilder = fromBuilder.endEvent(END_EVENT_ID).camundaExecutionListenerDelegateExpression(ExecutionListener.EVENTNAME_END, "${processListener}");
+            connect(fromBuilder,endEventBuilder,lastNode, END_EVENT_ID,sequenceFlows,childNodeMap);
+        return process.done();
+    }
+
+    private static AbstractFlowNodeBuilder<?, ?> moveToNode(AbstractFlowNodeBuilder<?, ?> startEventBuilder, String identifier) {
+        return startEventBuilder.moveToNode(identifier);
     }
 }
+
+
