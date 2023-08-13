@@ -646,11 +646,7 @@ public class WorkspaceProcessController {
             taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign"+COMMENT_SPLIT+handleDataDTO.getSignInfo());
         }
 
-
-//        runtimeService.createChangeActivityStateBuilder()
-//                .processInstanceId(task.getProcessInstanceId())
-//                .moveActivityIdsToSingleActivityId(taskIds,handleDataDTO.getRollbackId())
-//                .changeState();
+            //调用modify api  当然 因为本接口没有前端联调 就暂时不做了
         return Result.OK();
     }
 
@@ -724,9 +720,14 @@ public class WorkspaceProcessController {
     @ApiOperation("减签按钮")
     @PostMapping("/deleteMulti")
     public Result deleteMulti(@RequestBody List<String> executionIds){
-//        for (String executionId : executionIds) {
-//            runtimeService.deleteMultiInstanceExecution(executionId,true);
-//        }
+        for (String executionId : executionIds) {
+            Task task = taskService.createTaskQuery().executionId(executionId).singleResult();
+            String activanceId=task.getTaskDefinitionKey()+":"+executionId;
+            runtimeService.createProcessInstanceModification(task.getProcessInstanceId())
+                    .cancelActivityInstance(activanceId)
+                    .execute();
+        }
+
         return Result.OK();
     }
 
