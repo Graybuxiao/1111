@@ -54,7 +54,7 @@ public class CamundaFlowUtils {
         NodeJsonDataService nodeJsonDataService = SpringContextHolder.getBean(NodeJsonDataService.class);
         LambdaQueryWrapper<NodeJsonData> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(NodeJsonData::getProcessDefinitionId,execution.getProcessDefinitionId());
-        NodeJsonData nodeJsonData = nodeJsonDataService.list().get(0);
+        NodeJsonData nodeJsonData = nodeJsonDataService.getOne(lambdaQueryWrapper);
         String currentActivityId=execution.getCurrentActivityId();
         if(StringUtils.endsWith(execution.getCurrentActivityId(),MULTI_BODY)){
             currentActivityId=currentActivityId.replace(MULTI_BODY,"");

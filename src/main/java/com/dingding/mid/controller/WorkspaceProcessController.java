@@ -101,7 +101,7 @@ public class WorkspaceProcessController {
         processTemplates.setFormName(processTemplates.getTemplateName());
         ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery().processDefinitionKey(PROCESS_PREFIX + templateId).latestVersion().singleResult();
         if(processDefinition==null){
-            throw  new WorkFlowException("该流程暂未接入Flowable,请重试");
+            throw  new WorkFlowException("该流程暂未接入Camunda,请把这个流程图重新发布既可");
         }
         processTemplates.setProcessDefinitionId(processDefinition.getId());
         return Result.OK(processTemplates);
@@ -132,7 +132,7 @@ public class WorkspaceProcessController {
                     for (UserInfo userInfo : selectUserInfo) {
                         users.add(userInfo.getId());
                     }
-                    processVariables.put(string+MULTI_LIST,users);
+                    processVariables.put(string,users);
                 }
             }
 
