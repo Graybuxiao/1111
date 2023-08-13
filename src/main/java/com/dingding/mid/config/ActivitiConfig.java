@@ -50,9 +50,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 public class ActivitiConfig {
 	@Component
 	public class CamundaGlobalListenerPlugin extends AbstractProcessEnginePlugin {
+		@Resource
+		private IdWorkerIdGenerator idWorkerIdGenerator;
 		@Override
 		public void preInit(ProcessEngineConfigurationImpl processEngineConfiguration) {
-			IdWorkerIdGenerator idWorkerIdGenerator = SpringContextHolder.getBean(IdWorkerIdGenerator.class);
 			processEngineConfiguration.setIdGenerator(idWorkerIdGenerator);
 		}
 	}

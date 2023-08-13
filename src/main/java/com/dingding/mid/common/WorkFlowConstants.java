@@ -14,4 +14,5 @@ public interface WorkFlowConstants {
     String DEFAULT_ADMIN_ASSIGNEE="381496";
     String AUTO_REFUSE_STR="autoRefuse";
     String MULTI_BODY="#multiInstanceBody";
+    String MULTI_LIST="AssigneeList";
 }

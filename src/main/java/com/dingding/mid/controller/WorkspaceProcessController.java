@@ -61,8 +61,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.dingding.mid.common.CommonConstants.*;
-import static com.dingding.mid.common.WorkFlowConstants.COMMENT_SPLIT;
-import static com.dingding.mid.common.WorkFlowConstants.PROCESS_PREFIX;
+import static com.dingding.mid.common.WorkFlowConstants.*;
 import static com.dingding.mid.utils.BpmnModelUtils.getChildNode;
 
 /**
@@ -133,7 +132,7 @@ public class WorkspaceProcessController {
                     for (UserInfo userInfo : selectUserInfo) {
                         users.add(userInfo.getId());
                     }
-                    processVariables.put(string,users);
+                    processVariables.put(string+MULTI_LIST,users);
                 }
             }
 
@@ -799,7 +798,7 @@ public class WorkspaceProcessController {
                 while (iterator.hasNext()){
                     FormOperates next = iterator.next();
                     if("H".equals(next.getPerm())){
-                        iterator.remove();
+//                        iterator.remove();
                         if(jsonObject!=null){
                             jsonObject.remove(next.getId());
                         }
@@ -813,14 +812,19 @@ public class WorkspaceProcessController {
         if(sign){
             handleDataVO.setSignFlag(true);
         }
-        if(StringUtils.isNotBlank(HandleDataDTO.getTaskId())){
-            if(currentNode!=null){
-                if(currentNode.getProps().getSign()){
-                    handleDataVO.setSignFlag(true);
+        else{
+            if(StringUtils.isNotBlank(HandleDataDTO.getTaskId())){
+                if(currentNode!=null){
+                    if(currentNode.getProps().getSign()){
+                        handleDataVO.setSignFlag(true);
+                    }
+                    else{
+                        handleDataVO.setSignFlag(false);
+                    }
                 }
-                else{
-                    handleDataVO.setSignFlag(false);
-                }
+            }
+            else {
+                handleDataVO.setSignFlag(false);
             }
         }
 

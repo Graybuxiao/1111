@@ -117,7 +117,7 @@ CREATE TABLE `users` (
 
 /*Data for the table `users` */
 
-INSERT INTO `users`(`user_id`, `user_name`, `pingyin`, `alisa`, `avatar`, `sex`, `department_ids`, `entry_date`, `leave_date`, `admin`, `created`, `updated`) VALUES (100001, 'Java1号', 'lvren', 'Java1号', 'https://dd-static.jd.com/ddimg/jfs/t1/188230/26/28979/10654/633026fdEf64e5e84/fc5c07ab3d5eac19.png', 0, '1486186', '2022-10-20 13:33:36', '2023-10-28 13:33:39', 1, '2022-10-19 13:32:49', '2022-10-19 13:32:52');
+INSERT INTO `users`(`user_id`, `user_name`, `pingyin`, `alisa`, `avatar`, `sex`, `department_ids`, `entry_date`, `leave_date`, `admin`, `created`, `updated`) VALUES (100001, 'Java100号', 'lvren', 'Java100号', 'https://dd-static.jd.com/ddimg/jfs/t1/188230/26/28979/10654/633026fdEf64e5e84/fc5c07ab3d5eac19.png', 0, '1486186', '2022-10-20 13:33:36', '2023-10-28 13:33:39', 1, '2022-10-19 13:32:49', '2022-10-19 13:32:52');
 
 INSERT INTO `users`(`user_id`, `user_name`, `pingyin`, `alisa`, `avatar`, `sex`, `department_ids`, `entry_date`, `leave_date`, `admin`, `created`, `updated`) VALUES (100002, 'Java2号', 'lvren', 'Java2号', 'https://dd-static.jd.com/ddimg/jfs/t1/188230/26/28979/10654/633026fdEf64e5e84/fc5c07ab3d5eac19.png', 0, '1486186', '2022-10-20 13:33:36', '2023-10-28 13:33:39', 1, '2022-10-19 13:32:49', '2022-10-19 13:32:52');
 
@@ -136,6 +136,13 @@ INSERT INTO `users`(`user_id`, `user_name`, `pingyin`, `alisa`, `avatar`, `sex`,
 INSERT INTO `users`(`user_id`, `user_name`, `pingyin`, `alisa`, `avatar`, `sex`, `department_ids`, `entry_date`, `leave_date`, `admin`, `created`, `updated`) VALUES (100009, 'Java9号', 'lvren', 'Java9号', 'https://dd-static.jd.com/ddimg/jfs/t1/188230/26/28979/10654/633026fdEf64e5e84/fc5c07ab3d5eac19.png', 0, '1486186', '2022-10-20 13:33:36', '2023-10-28 13:33:39', 1, '2022-10-19 13:32:49', '2022-10-19 13:32:52');
 
 INSERT INTO `users`(`user_id`, `user_name`, `pingyin`, `alisa`, `avatar`, `sex`, `department_ids`, `entry_date`, `leave_date`, `admin`, `created`, `updated`) VALUES (1000010, 'Java10号', 'lvren', 'Java10号', 'https://dd-static.jd.com/ddimg/jfs/t1/188230/26/28979/10654/633026fdEf64e5e84/fc5c07ab3d5eac19.png', 0, '1486186', '2022-10-20 13:33:36', '2023-10-28 13:33:39', 1, '2022-10-19 13:32:49', '2022-10-19 13:32:52');
+
+DROP TABLE IF EXISTS `node_json_data`;
+CREATE TABLE `node_json_data` (
+                                  `id` varchar(64) DEFAULT NULL,
+                                  `process_definition_id` varchar(64) DEFAULT NULL,
+                                  `node_json_data` longtext
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
