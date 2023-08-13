@@ -658,31 +658,7 @@ public class BpmnModelUtils {
                         String unit = timeout.getString("unit");
                         Integer value = timeout.getInteger("value");
                         if(value>0){
-//                            BoundaryEvent boundaryEvent = builder.done().newInstance(BoundaryEvent.class);
-//                            boundaryEventBuilder.cancelActivity()
-//                            List<BoundaryEvent> boundaryEvents= new ArrayList<>();
-//                            boundaryEvent.setId(id("boundaryEvent"));
-//                            boundaryEvent.setAttachedTo(userTask);
-//                            boundaryEvent.setCancelActivity(Boolean.TRUE);
-//                            TimerEventDefinition timerEventDefinition = new TimerEventDefinition();
-//                            if("D".equals(unit)){
-//                                timerEventDefinition.setTimeDuration("P"+value+unit);
-//                            }
-//                            else{
-//                                timerEventDefinition.setTimeDuration("PT"+value+unit);
-//                            }
-//                            timerEventDefinition.setId(id("timerEventDefinition"));
-//                            boundaryEvent.getEventDefinitions(timerEventDefinition);
-//                            FlowableListener flowableListener = new FlowableListener();
-//                            flowableListener.setEvent(ExecutionListener.EVENTNAME_END);
-//                            flowableListener.setImplementationType(IMPLEMENTATION_TYPE_CLASS);
-//                            flowableListener.setImplementation("com.dingding.mid.listener.TimerListener");
-//                            List<FlowableListener> listenerList= new ArrayList<>();
-//                            listenerList.add(flowableListener);
-//                            boundaryEvent.setExecutionListeners(listenerList);
-//                            process.addFlowElement(boundaryEvent);
-//                            boundaryEvents.add(boundaryEvent);
-//                            userTask.setBoundaryEvents(boundaryEvents);
+                            //超时自动通过待补充 ,也许会换另一种方式
                         }
                     }
                 }
