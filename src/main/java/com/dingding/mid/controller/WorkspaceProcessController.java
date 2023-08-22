@@ -816,7 +816,8 @@ public class WorkspaceProcessController {
         else{
             if(StringUtils.isNotBlank(HandleDataDTO.getTaskId())){
                 if(currentNode!=null){
-                    if(currentNode.getProps().getSign()){
+                    Boolean signFlag = currentNode.getProps().getSign();
+                    if(signFlag!=null && signFlag){
                         handleDataVO.setSignFlag(true);
                     }
                     else{
