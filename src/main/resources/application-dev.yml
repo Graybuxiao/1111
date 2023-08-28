@@ -51,23 +51,6 @@ spring:
 
 
 
-flowable:
-  dmn:
-    enabled: false
-  cmmn:
-    enabled: false
-  idm:
-    enabled: false
-  async-history-executor-activate: false
-  async-executor-activate: false
-  check-process-definitions: false
-  content:
-    enabled: false
-  app:
-    enabled: false
-  eventregistry:
-    enabled: false
-
 config:
   minio:
     endpoint: http://192.168.0.147:9000/ #服务端地址
