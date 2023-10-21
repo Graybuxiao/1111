@@ -14,7 +14,11 @@
  */
 package com.dingding.mid.flowlong.service;
 
+import cn.hutool.core.map.MapUtil;
+import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.TypeReference;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.dingding.mid.dto.json.UserInfo;
 import com.dingding.mid.flowlong.TaskAccessStrategy;
 import com.dingding.mid.flowlong.TaskService;
 import com.dingding.mid.flowlong.assist.Assert;
@@ -48,6 +52,7 @@ import java.util.stream.Collectors;
  * @author hubin
  * @since 1.0
  */
+@SuppressWarnings("all")
 public class TaskServiceImpl implements TaskService {
     private TaskAccessStrategy taskAccessStrategy;
     private FlwProcessMapper processMapper;
@@ -516,6 +521,7 @@ public class TaskServiceImpl implements TaskService {
         List<FlwTask> flwTasks = new ArrayList<>();
         if (performType == PerformType.unknown) {
             // 发起、其它
+            flwTask.setVariable(execution.getArgs());
             taskMapper.insert(flwTask);
             if (ObjectUtils.isNotEmpty(taskActors)) {
                 // 发起人保存参与者
@@ -585,12 +591,54 @@ public class TaskServiceImpl implements TaskService {
      */
     private List<FlwTaskActor> getTaskActors(NodeModel nodeModel, Execution execution) {
         List<FlwTaskActor> flwHisTaskActors = new ArrayList<>();
-        if (ObjectUtils.isNotEmpty(nodeModel.getNodeUserList())) {
-            // 指定用户审批
-            nodeModel.getNodeUserList().forEach(t -> flwHisTaskActors.add(FlwTaskActor.ofUser(t.getId(), t.getName())));
-        } else if (ObjectUtils.isNotEmpty(nodeModel.getNodeRoleList())) {
-            // 指定角色审批
-            nodeModel.getNodeRoleList().forEach(t -> flwHisTaskActors.add(FlwTaskActor.ofRole(t.getId(), t.getName())));
+        if(0==nodeModel.getType()){
+            Map<String, Object> args = execution.getArgs();
+            String root = MapUtil.getStr(args, "root");
+            List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
+            });
+            UserInfo userInfo = userInfos.get(0);
+            flwHisTaskActors.add(FlwTaskActor.ofUser(userInfo.getId(), userInfo.getName()));
+        }
+        else{
+            if (ObjectUtils.isNotEmpty(nodeModel.getNodeUserList())) {
+                Integer setType = nodeModel.getSetType();
+                //指定成员
+                if(1==setType){
+                    nodeModel.getNodeUserList().forEach(t -> flwHisTaskActors.add(FlwTaskActor.ofUser(t.getId(), t.getName())));
+                }
+                //主管
+                else if(2==setType){
+
+                }
+                //发起人自选..flowlong做不了, 因为没有唯一id
+                else if(4==setType){
+//                Map<String, Object> args = execution.getArgs();
+//                args.get(nodeModel.)
+                }
+                else if(7==setType){
+//                Map<String, Object> args = execution.getArgs();
+//                String root = MapUtil.getStr(args, "root");
+//                List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
+//                });
+//                UserInfo userInfo = userInfos.get(0);
+//                flwHisTaskActors.add(FlwTaskActor.ofUser(userInfo.getId(), userInfo.getName());
+                }
+
+
+
+            }
+            else if (ObjectUtils.isNotEmpty(nodeModel.getNodeRoleList())) {
+                // 指定角色审批
+                nodeModel.getNodeRoleList().forEach(t -> flwHisTaskActors.add(FlwTaskActor.ofRole(t.getId(), t.getName())));
+            }
+            else if(5==nodeModel.getSetType()){
+                Map<String, Object> args = execution.getArgs();
+                String root = MapUtil.getStr(args, "root");
+                List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
+                });
+                UserInfo userInfo = userInfos.get(0);
+                flwHisTaskActors.add(FlwTaskActor.ofUser(userInfo.getId(), userInfo.getName()));
+            }
         }
         return ObjectUtils.isEmpty(flwHisTaskActors) ? null : flwHisTaskActors;
     }

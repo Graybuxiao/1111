@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -35,14 +36,15 @@ import java.util.*;
 @Slf4j
 @Configuration
 @ComponentScan("com")
-@MapperScan(basePackages = {"com.dingding.mid.mapper"})
+@MapperScan(basePackages = {"com.dingding.mid.mapper","com.dingding.mid.flowlong.mapper"})
+@EnableTransactionManagement
 public class MybatisPlusConfig {
 
     /**
      * 对接数据库的实体层
      */
     static final String ALIASES_PACKAGE = "com.dingding.mid.entity";
-    
+
     @javax.annotation.Resource
     private DataSourceProperties dataSourceProperties;
 
@@ -51,8 +53,8 @@ public class MybatisPlusConfig {
     public DataSource dataSourceOne() throws Exception{
         return druidDataSource();
     }
-    
-    
+
+
     protected DataSource druidDataSource() throws Exception{
         DruidDataSource dataSource = new DruidDataSource();
         dataSource.setUsername(dataSourceProperties.getUsername());
@@ -123,7 +125,7 @@ public class MybatisPlusConfig {
         mybatisConfiguration.setCacheEnabled(true);
         mybatisConfiguration.setLogImpl(Slf4jImpl.class);
         mybatisConfiguration.setJdbcTypeForNull(JdbcType.NULL);
-        
+
         return mybatisConfiguration;
     }
     @Bean

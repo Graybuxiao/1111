@@ -16,8 +16,11 @@ spring:  #环境 dev|test|pro|preview
     time-zone: GMT+8 #指定日期格式化时区
   main:
     allow-bean-definition-overriding: true #允许同名bean后者覆盖,默认：true
-    allow-circular-references: true #允许Bean相互引用,默认：false    
+    allow-circular-references: true #允许Bean相互引用,默认：false
 server:
   error:
     whitelabel:
       enabled: false
+flowlong:
+  remind:
+    cron: "*/5 * * * * ?"

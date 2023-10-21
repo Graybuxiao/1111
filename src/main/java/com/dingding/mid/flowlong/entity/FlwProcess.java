@@ -14,6 +14,7 @@
  */
 package com.dingding.mid.flowlong.entity;
 
+import com.dingding.mid.flowlong.assist.Assert;
 import com.dingding.mid.flowlong.core.Execution;
 import com.dingding.mid.flowlong.core.FlowLongContext;
 import com.dingding.mid.flowlong.core.enums.FlowState;

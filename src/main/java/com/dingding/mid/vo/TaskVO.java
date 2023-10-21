@@ -6,7 +6,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
-import org.flowable.task.api.DelegationState;
 
 import java.util.Date;
 
@@ -40,7 +39,8 @@ public class TaskVO {
     @ApiModelProperty("耗时")
     private String duration;
     @ApiModelProperty("委派状态")
-    private DelegationState delegationState;
+    private String state;
+//    private DelegationState delegationState;
     @ApiModelProperty("发起人(带icon)")
     private Users users;
     @ApiModelProperty("节点id")

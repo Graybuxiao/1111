@@ -88,4 +88,5 @@ public class ProcessTemplates implements Serializable {
     private String logo;
     @TableField(exist = false)
     private String processDefinitionId;
+    private Long flowLongId;
 }

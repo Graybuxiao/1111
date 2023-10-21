@@ -27,7 +27,7 @@ import java.util.*;
  */
 @Getter
 @Setter
-public class NodeModel implements ModelInstance {
+public class NodeModel extends BaseEx implements ModelInstance {
     /**
      * 节点名称
      */
@@ -45,6 +45,14 @@ public class NodeModel implements ModelInstance {
     private Integer type;
     /**
      * 审核人类型
+     * <p>
+     * 1，指定成员
+     * 2，主管
+     * 3，角色
+     * 4，发起人自选
+     * 5，发起人自己
+     * 7，连续多级主管
+     * </p>
      */
     private Integer setType;
     /**
@@ -65,6 +73,10 @@ public class NodeModel implements ModelInstance {
     private Integer directorLevel;
     /**
      * 发起人自选类型
+     * <p>
+     * 1，自选一个人
+     * 2，自选多个人
+     * </p>
      */
     private Integer selectMode;
     /**
@@ -80,7 +92,7 @@ public class NodeModel implements ModelInstance {
      */
     private Integer termMode;
     /**
-     * 多人审批时审批方式 {@link com.flowlong.bpm.engine.core.enums.PerformType}
+     * 多人审批时审批方式 {@link com.flowlong.bpm.engine.core.enums}
      * <p>
      * 1，按顺序依次审批
      * 2，会签 (可同时审批，每个人必须审批通过)
@@ -90,12 +102,16 @@ public class NodeModel implements ModelInstance {
     private Integer examineMode;
     /**
      * 连续主管审批方式
+     * <p>
+     * 1，直到最上级主管
+     * 2，自定义审批终点
+     * </p>
      */
     private Integer directorMode;
     /**
      * 条件节点列表
      */
-    private List<ConditionNode> conditionNodes;
+//    private List<ConditionNode> conditionNodes;
     /**
      * 允许发起人自选抄送人
      */
@@ -103,7 +119,7 @@ public class NodeModel implements ModelInstance {
     /**
      * 子节点
      */
-    private NodeModel childNode;
+//    private NodeModel childNode;
     /**
      * 父节点，模型 json 不存在该属性、属于逻辑节点
      */
@@ -111,7 +127,7 @@ public class NodeModel implements ModelInstance {
 
     @Override
     public void execute(FlowLongContext flowLongContext, Execution execution) {
-        if (ObjectUtils.isNotEmpty(this.conditionNodes)) {
+        if (ObjectUtils.isNotEmpty(this.getConditionNodes())) {
             /**
              * 执行条件分支
              */
@@ -119,7 +135,7 @@ public class NodeModel implements ModelInstance {
             Assert.illegalArgument(ObjectUtils.isEmpty(args), "Execution parameter cannot be empty");
             Expression expression = flowLongContext.getExpression();
             Assert.isNull(expression, "Interface Expression not implemented");
-            Optional<ConditionNode> conditionNodeOptional = conditionNodes.stream().sorted(Comparator.comparing(ConditionNode::getPriorityLevel))
+            Optional<ConditionNode> conditionNodeOptional = this.getConditionNodes().stream().sorted(Comparator.comparing(ConditionNode::getPriorityLevel))
                     .filter(t -> {
                         // 执行条件分支
                         final String expr = t.getExpr();
@@ -167,15 +183,15 @@ public class NodeModel implements ModelInstance {
         if (Objects.equals(this.nodeName, nodeName)) {
             return this;
         }
-        if (null != conditionNodes) {
+        if (null != this.getConditionNodes()) {
             NodeModel fromConditionNode = getFromConditionNodes(nodeName);
             if (fromConditionNode != null) {
                 return fromConditionNode;
             }
         }
         // 条件节点中没有找到 那么去它的同级子节点中继续查找
-        if (null != childNode) {
-            return childNode.getNode(nodeName);
+        if (null != this.getChildNode()) {
+            return this.getChildNode().getNode(nodeName);
         }
         return null;
     }
@@ -187,7 +203,7 @@ public class NodeModel implements ModelInstance {
      * @return {@link NodeModel}
      */
     private NodeModel getFromConditionNodes(String nodeName) {
-        for (ConditionNode conditionNode : conditionNodes) {
+        for (ConditionNode conditionNode : getConditionNodes()) {
             NodeModel conditionChildNode = conditionNode.getChildNode();
             if (null != conditionChildNode) {
                 NodeModel nodeModel = conditionChildNode.getNode(nodeName);

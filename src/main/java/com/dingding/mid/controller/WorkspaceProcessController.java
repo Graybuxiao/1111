@@ -18,6 +18,15 @@ import com.dingding.mid.entity.ProcessTemplates;
 import com.dingding.mid.entity.Users;
 import com.dingding.mid.enums.RefuseEnums;
 import com.dingding.mid.exception.WorkFlowException;
+import com.dingding.mid.flowlong.FlowLongEngine;
+import com.dingding.mid.flowlong.ProcessService;
+import com.dingding.mid.flowlong.RuntimeService;
+import com.dingding.mid.flowlong.TaskService;
+import com.dingding.mid.flowlong.core.FlowCreator;
+import com.dingding.mid.flowlong.entity.*;
+import com.dingding.mid.flowlong.mapper.FlwHisInstanceMapper;
+import com.dingding.mid.flowlong.mapper.FlwHisTaskMapper;
+import com.dingding.mid.flowlong.mapper.FlwTaskMapper;
 import com.dingding.mid.service.CcService;
 import com.dingding.mid.service.ProcessTemplateService;
 import com.dingding.mid.service.UserService;
@@ -26,6 +35,7 @@ import com.dingding.mid.utils.SpringContextHolder;
 import com.dingding.mid.vo.*;
 import com.github.xiaoymin.knife4j.annotations.ApiOperationSupport;
 import com.github.xiaoymin.knife4j.annotations.ApiSort;
+import com.sun.xml.internal.ws.api.message.Attachment;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.errors.*;
@@ -33,29 +43,7 @@ import io.minio.http.Method;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import liquibase.pro.packaged.S;
 import org.apache.commons.lang3.StringUtils;
-import org.flowable.bpmn.model.BpmnModel;
-import org.flowable.bpmn.model.FlowElement;
-import org.flowable.bpmn.model.Process;
-import org.flowable.common.engine.impl.identity.Authentication;
-import org.flowable.engine.HistoryService;
-import org.flowable.engine.RepositoryService;
-import org.flowable.engine.RuntimeService;
-import org.flowable.engine.TaskService;
-import org.flowable.engine.history.HistoricActivityInstance;
-import org.flowable.engine.history.HistoricProcessInstance;
-import org.flowable.engine.impl.persistence.entity.ExecutionEntity;
-import org.flowable.engine.repository.ProcessDefinition;
-import org.flowable.engine.runtime.ActivityInstance;
-import org.flowable.engine.runtime.Execution;
-import org.flowable.engine.runtime.ProcessInstance;
-import org.flowable.engine.runtime.ProcessInstanceBuilder;
-import org.flowable.engine.task.Attachment;
-import org.flowable.engine.task.Comment;
-import org.flowable.task.api.DelegationState;
-import org.flowable.task.api.Task;
-import org.flowable.task.api.history.HistoricTaskInstance;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -67,13 +55,12 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.dingding.mid.common.CommonConstants.*;
 import static com.dingding.mid.common.WorkFlowConstants.*;
-import static com.dingding.mid.utils.BpmnModelUtils.getChildNode;
-import static com.dingding.mid.utils.BpmnModelUtils.getChildNodeByNodeId;
 
 /**
  * @author : willian fu
@@ -88,20 +75,23 @@ public class WorkspaceProcessController {
     @Resource
     private ProcessTemplateService processTemplateService;
     @Resource
-    private RepositoryService repositoryService;
-    @Resource
     private RuntimeService runtimeService;
-    @Resource
-    private HistoryService historyService;
     @Resource
     private TaskService taskService;
     @Resource
     private UserService userService;
     @Resource
     private CcService ccService;
-
-
-
+    @Resource
+    private ProcessService processService;
+    @Resource
+    private FlowLongEngine flowLongEngine;
+    @Resource
+    private FlwHisInstanceMapper flwHisInstanceMapper;
+    @Resource
+    private FlwTaskMapper flwTaskMapper;
+    @Resource
+    private FlwHisTaskMapper flwHisTaskMapper;
 
     @ApiOperation("通过模板id查看流程信息 会附带流程定义id")
     @ApiOperationSupport(order = 1)
@@ -112,11 +102,11 @@ public class WorkspaceProcessController {
         processTemplates.setLogo(processTemplates.getIcon());
         processTemplates.setFormId(processTemplates.getTemplateId());
         processTemplates.setFormName(processTemplates.getTemplateName());
-        ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery().processDefinitionKey(PROCESS_PREFIX + templateId).latestVersion().singleResult();
-        if(processDefinition==null){
-            throw  new WorkFlowException("该流程暂未接入Flowable,请重试");
+        FlwProcess processById = processService.getProcessById(processTemplates.getFlowLongId());
+        if(processById==null){
+            throw  new WorkFlowException("该流程暂未接入FlowLong,请重试");
         }
-        processTemplates.setProcessDefinitionId(processDefinition.getId());
+        processTemplates.setProcessDefinitionId(processById.getId()+"");
         return Result.OK(processTemplates);
     }
 
@@ -128,8 +118,13 @@ public class WorkspaceProcessController {
         try{
             JSONObject formData = startProcessInstanceDTO.getFormData();
             UserInfo startUserInfo = startProcessInstanceDTO.getStartUserInfo();
-            Authentication.setAuthenticatedUserId(startUserInfo.getId());
+            FlowCreator flowCreator = FlowCreator.of(startUserInfo.getId(), startUserInfo.getName());
+            LambdaQueryWrapper<ProcessTemplates> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+            lambdaQueryWrapper.eq(ProcessTemplates::getFlowLongId,startProcessInstanceDTO.getProcessDefinitionId());
+            lambdaQueryWrapper.select(ProcessTemplates::getTemplateName);
+            ProcessTemplates processTemplates = processTemplateService.getOne(lambdaQueryWrapper);
             Map<String,Object> processVariables= new HashMap<>();
+            processVariables.put(PROCESS_NAME,processTemplates.getTemplateName());
             processVariables.put(FORM_VAR,formData);
             processVariables.put(PROCESS_STATUS,BUSINESS_STATUS_1);
             processVariables.put(START_USER_INFO,JSONObject.toJSONString(startUserInfo));
@@ -151,18 +146,17 @@ public class WorkspaceProcessController {
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
             });
             processVariables.putAll(formValue);
-            ProcessInstanceBuilder processInstanceBuilder = runtimeService.createProcessInstanceBuilder();
-            ProcessInstance processInstance = processInstanceBuilder
-                    .processDefinitionId(startProcessInstanceDTO.getProcessDefinitionId())
-                    .variables(processVariables)
-                    .businessStatus(BUSINESS_STATUS_1)
-                    .start();
+
+            Optional<FlwInstance> flwInstance = flowLongEngine.startInstanceById(Long.valueOf(startProcessInstanceDTO.getProcessDefinitionId()), flowCreator, processVariables);
+
+            this.executeActiveTasks(flwInstance.get().getId(), flowCreator);
+
             //手动完成第一个任务
-            Task task = taskService.createTaskQuery().processInstanceId(processInstance.getId()).singleResult();
-            if(task!=null){
-                taskService.complete(task.getId());
-            }
-            return Result.OK(processInstance.getId());
+//            Task task = taskService.createTaskQuery().processInstanceId(processInstance.getId()).singleResult();
+//            if(task!=null){
+//                taskService.complete(task.getId());
+//            }
+            return Result.OK(flwInstance.get().getId());
         }
         catch (Exception e){
             Throwable cause = e.getCause();
@@ -174,7 +168,260 @@ public class WorkspaceProcessController {
             return Result.error("启动流程失败");
         }
     }
-    @ApiOperation("查看抄送")
+
+    public void executeActiveTasks(Long instanceId, FlowCreator testCreator) {
+        this.executeActiveTasks(instanceId, t -> this.flowLongEngine.executeTask(t.getId(), testCreator));
+    }
+
+    public void executeActiveTasks(Long instanceId, Consumer<FlwTask> taskConsumer) {
+        this.flowLongEngine.queryService().getActiveTasksByInstanceId(instanceId)
+                .ifPresent(tasks -> tasks.forEach(t -> taskConsumer.accept(t)));
+    }
+
+    @ApiOperation("查看我发起的流程")
+    @ApiOperationSupport(order = 3)
+    @PostMapping("process/applyList")
+    public Result< Page<HistoryProcessInstanceVO>> applyList(@RequestBody ApplyDTO applyDTO){
+
+        LambdaQueryWrapper<FlwHisInstance> flwHisInstanceLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        flwHisInstanceLambdaQueryWrapper.eq(FlwHisInstance::getCreateId,applyDTO.getCurrentUserInfo().getId());
+        flwHisInstanceLambdaQueryWrapper.orderByDesc(FlwHisInstance::getCreateTime);
+        List<FlwHisInstance> flwHisInstances = flwHisInstanceMapper.selectList(flwHisInstanceLambdaQueryWrapper);
+        Long count = flwHisInstanceMapper.selectCount(flwHisInstanceLambdaQueryWrapper);
+        List<String> applyUserIds= new ArrayList<>();
+
+
+        for (FlwHisInstance historicProcessInstance : flwHisInstances) {
+            Map<String, Object> processVariables = historicProcessInstance.getVariableMap();
+            String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
+            }).getId();
+            applyUserIds.add(id);
+        }
+        Map<Long, Users> collect=new HashMap<>();
+        if(CollUtil.isNotEmpty(applyUserIds)){
+            LambdaQueryWrapper<Users> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+            lambdaQueryWrapper.in(Users::getUserId,applyUserIds);
+            List<Users> list = userService.list(lambdaQueryWrapper);
+            collect = list.stream().collect(Collectors.toMap(Users::getUserId, Function.identity()));
+        }
+
+        List<HistoryProcessInstanceVO> historyProcessInstanceVOS= new ArrayList<>();
+        Page<HistoryProcessInstanceVO> page=new Page<>();
+        for (FlwHisInstance historicProcessInstance : flwHisInstances) {
+            Map<String, Object> processVariables = historicProcessInstance.getVariableMap();
+            HistoryProcessInstanceVO historyProcessInstanceVO=new HistoryProcessInstanceVO();
+            historyProcessInstanceVO.setProcessInstanceId(historicProcessInstance.getId()+"");
+            //todo column
+            historyProcessInstanceVO.setProcessDefinitionName(MapUtil.getStr(processVariables,PROCESS_NAME));
+            historyProcessInstanceVO.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
+            historyProcessInstanceVO.setUsers(collect.get(Long.valueOf(historyProcessInstanceVO.getStartUser().getId())));
+            historyProcessInstanceVO.setStartTime(historicProcessInstance.getCreateTime());
+            historyProcessInstanceVO.setEndTime(historicProcessInstance.getEndTime());
+            Boolean flag= historicProcessInstance.getEndTime() != null;
+            historyProcessInstanceVO.setCurrentActivityName(getCurrentName(historicProcessInstance.getId()+"",flag));
+            historyProcessInstanceVO.setBusinessStatus(MapUtil.getStr(processVariables,PROCESS_STATUS));
+
+
+            long totalTimes = historicProcessInstance.getEndTime()==null?
+                    (Calendar.getInstance().getTimeInMillis()-historicProcessInstance.getCreateTime().getTime()):
+                    (historicProcessInstance.getEndTime().getTime()-historicProcessInstance.getCreateTime().getTime());
+            long dayCount = totalTimes /(1000*60*60*24);//计算天
+            long restTimes = totalTimes %(1000*60*60*24);//剩下的时间用于计于小时
+            long hourCount = restTimes/(1000*60*60);//小时
+            restTimes = restTimes % (1000*60*60);
+            long minuteCount = restTimes / (1000*60);
+
+            String spendTimes = dayCount+"天"+hourCount+"小时"+minuteCount+"分";
+            historyProcessInstanceVO.setDuration(spendTimes);
+            historyProcessInstanceVOS.add(historyProcessInstanceVO);
+        }
+        page.setRecords(historyProcessInstanceVOS);
+        page.setCurrent(applyDTO.getPageNo());
+        page.setSize(applyDTO.getPageSize());
+        page.setTotal(count);
+        return Result.OK(page);
+    }
+
+    private   String getCurrentName(String processInstanceId,Boolean flag){
+        if(flag){
+            return "流程已结束";
+        }
+        LambdaQueryWrapper<FlwTask> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(FlwTask::getInstanceId,processInstanceId);
+        lambdaQueryWrapper.select(FlwTask::getTaskName);
+        List<FlwTask> flwTasks = flwTaskMapper.selectList(lambdaQueryWrapper);
+        if(CollUtil.isEmpty(flwTasks)){
+            return "";
+        }
+        else{
+            String taskName = flwTasks.get(0).getTaskName();
+            return taskName;
+        }
+    }
+
+    @ApiOperation("通过流程实例id查看详情")
+    @PostMapping("process/instanceInfo")
+    public Result<HandleDataVO> instanceInfo(@RequestBody HandleDataDTO HandleDataDTO){
+        String processInstanceId = HandleDataDTO.getProcessInstanceId();
+        FlwHisInstance historicProcessInstance = flwHisInstanceMapper.selectById(processInstanceId);
+        Long processId = historicProcessInstance.getProcessId();
+        LambdaQueryWrapper<ProcessTemplates> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(ProcessTemplates::getFlowLongId,processId);
+        ProcessTemplates processTemplates = processTemplateService.getOne(lambdaQueryWrapper);
+        processTemplates.setLogo(processTemplates.getIcon());
+        processTemplates.setFormId(processTemplates.getTemplateId());
+        processTemplates.setFormName(processTemplates.getTemplateName());
+        processTemplates.setProcessDefinitionId(processId+"");
+
+        HandleDataVO handleDataVO =new HandleDataVO();
+        Map<String, Object> processVariables = historicProcessInstance.getVariableMap();
+
+        handleDataVO.setProcessInstanceId(historicProcessInstance.getId()+"");
+        JSONObject jsonObject = (JSONObject) processVariables.get(FORM_VAR);
+        handleDataVO.setFormData(jsonObject);
+        String process = processTemplates.getProcess();
+        ChildNode childNode = JSONObject.parseObject(process, new TypeReference<ChildNode>(){});
+        SettingsInfo settingsInfo = JSONObject.parseObject(processTemplates.getSettings(), new TypeReference<SettingsInfo>() {});
+        Boolean sign = settingsInfo.getSign();
+        ChildNode currentNode=null;
+        if(StringUtils.isNotBlank(HandleDataDTO.getTaskId())){
+            FlwHisTask historicTaskInstance = flwHisTaskMapper.selectById(HandleDataDTO.getTaskId());
+//            List<FormOperates> formPerms = currentNode.getProps().getFormPerms();
+//            if(CollUtil.isNotEmpty(formPerms)){
+//                Iterator<FormOperates> iterator = formPerms.iterator();
+//                while (iterator.hasNext()){
+//                    FormOperates next = iterator.next();
+//                    if("H".equals(next.getPerm())){
+////                        iterator.remove();
+//                        if(jsonObject!=null){
+//                            jsonObject.remove(next.getId());
+//                        }
+//                    }
+//                }
+//            }
+            handleDataVO.setCurrentNode(currentNode);
+            handleDataVO.setTaskId(HandleDataDTO.getTaskId());
+        }
+
+        if(sign){
+            handleDataVO.setSignFlag(true);
+        }
+        else{
+            if(StringUtils.isNotBlank(HandleDataDTO.getTaskId())){
+                if(currentNode!=null){
+                    if(currentNode.getProps().getSign()){
+                        handleDataVO.setSignFlag(true);
+                    }
+                    else{
+                        handleDataVO.setSignFlag(false);
+                    }
+                }
+            }
+            else {
+                handleDataVO.setSignFlag(false);
+            }
+        }
+
+//        LambdaQueryWrapper<FlwHisTask>  taskLambdaQueryWrapper = new LambdaQueryWrapper<>();
+//        taskLambdaQueryWrapper.eq(FlwHisTask::getInstanceId,HandleDataDTO.getProcessInstanceId());
+//        List<FlwHisTask> list = flwHisTaskMapper.selectList(taskLambdaQueryWrapper);
+//        Map<String,List<FlwHisTask>> historicActivityInstanceMap =new HashMap<>();
+//        for (HistoricActivityInstance historicActivityInstance : list) {
+//            List<HistoricActivityInstance> historicActivityInstances = historicActivityInstanceMap.get(historicActivityInstance.getActivityId());
+//            if(historicActivityInstances==null){
+//                historicActivityInstances =new ArrayList<>();
+//                historicActivityInstances.add(historicActivityInstance);
+//                historicActivityInstanceMap.put(historicActivityInstance.getActivityId(),historicActivityInstances);
+//            }
+//            else{
+//                historicActivityInstances.add(historicActivityInstance);
+//                historicActivityInstanceMap.put(historicActivityInstance.getActivityId(),historicActivityInstances);
+//            }
+//        }
+//
+//        Process mainProcess = repositoryService.getBpmnModel(historicProcessInstance.getProcessDefinitionId()).getMainProcess();
+//        Collection<FlowElement> flowElements = mainProcess.getFlowElements();
+//
+//        List<String> runningList= new ArrayList<>();
+//        handleDataVO.setRunningList(runningList);
+//        List<String> endList=new ArrayList<>();
+//        handleDataVO.setEndList(endList);
+//        List<String> noTakeList=new ArrayList<>();
+//        handleDataVO.setNoTakeList(noTakeList);
+//        Map<String,List<TaskDetailVO>> deatailMap =new HashMap<>();
+//        List<Comment> processInstanceComments = taskService.getProcessInstanceComments(historicProcessInstance.getId());
+//        List<Attachment> processInstanceAttachments = taskService.getProcessInstanceAttachments(historicProcessInstance.getId());
+//        for (FlowElement flowElement : flowElements) {
+//            List<TaskDetailVO> detailVOList =new ArrayList<>();
+//            List<HistoricActivityInstance> historicActivityInstanceList = historicActivityInstanceMap.get(flowElement.getId());
+//            if(CollUtil.isNotEmpty(historicActivityInstanceList)){
+//                for (HistoricActivityInstance historicActivityInstance : historicActivityInstanceList) {
+//                    if(historicActivityInstance.getEndTime()!=null){
+//                        if("startEvent".equalsIgnoreCase(historicActivityInstance.getActivityType()) ||"endEvent".equalsIgnoreCase(historicActivityInstance.getActivityType())){
+//                            TaskDetailVO taskDetailVO = new TaskDetailVO();
+//                            taskDetailVO.setActivityId(historicActivityInstance.getActivityId());
+//                            taskDetailVO.setName(historicActivityInstance.getActivityName());
+//                            taskDetailVO.setCreateTime(historicActivityInstance.getStartTime());
+//                            taskDetailVO.setEndTime(historicActivityInstance.getEndTime());
+//                            detailVOList.add(taskDetailVO);
+//                            deatailMap.put(historicActivityInstance.getActivityId(),detailVOList);
+//                            endList.add(historicActivityInstance.getActivityId());
+//                        }
+//                        else if ("userTask".equalsIgnoreCase(historicActivityInstance.getActivityType())){
+//                            List<TaskDetailVO> voList = deatailMap.get(historicActivityInstance.getActivityId());
+//                            List<HistoricActivityInstance> activityInstanceList = list.stream().filter(h -> h.getActivityId().equals(historicActivityInstance.getActivityId()) &&h.getEndTime()!=null).collect(Collectors.toList());
+//                            if(voList!=null){
+//                                collectUserTaskInfo(processInstanceComments, processInstanceAttachments, historicActivityInstance, voList, activityInstanceList);
+//                            }
+//                            else{
+//                                voList=new ArrayList<>();
+//                                collectUserTaskInfo(processInstanceComments, processInstanceAttachments, historicActivityInstance, voList, activityInstanceList);
+//                            }
+//                            deatailMap.put(historicActivityInstance.getActivityId(),voList);
+//                            endList.add(historicActivityInstance.getActivityId());
+//                        }
+//                        else if("serviceTask".equalsIgnoreCase(historicActivityInstance.getActivityType())){
+//
+//                        }
+//                    }
+//                    else{
+//                        if ("userTask".equalsIgnoreCase(historicActivityInstance.getActivityType())){
+//                            List<TaskDetailVO> voList = deatailMap.get(historicActivityInstance.getActivityId());
+//                            List<HistoricActivityInstance> activityInstanceList = list.stream().filter(h -> h.getActivityId().equals(historicActivityInstance.getActivityId()) &&h.getEndTime()==null).collect(Collectors.toList());
+//                            if(voList!=null){
+//                                collectUserTaskInfo(processInstanceComments, processInstanceAttachments, historicActivityInstance, voList, activityInstanceList);
+//                            }
+//                            else{
+//                                voList=new ArrayList<>();
+//                                collectUserTaskInfo(processInstanceComments, processInstanceAttachments, historicActivityInstance, voList, activityInstanceList);
+//                            }
+//                            deatailMap.put(historicActivityInstance.getActivityId(),voList);
+//                            if(endList.contains(historicActivityInstance.getActivityId())){
+//                                endList.remove(historicActivityInstance.getActivityId());
+//                                runningList.add(historicActivityInstance.getActivityId());
+//                            }
+//                            else{
+//                                runningList.add(historicActivityInstance.getActivityId());
+//                            }
+//                        }
+//                        else if("serviceTask".equalsIgnoreCase(historicActivityInstance.getActivityType())){
+//
+//                        }
+//                    }
+//                }
+//            }
+//            else{
+//                noTakeList.add(flowElement.getId());
+//            }
+//        }
+        handleDataVO.setProcessTemplates(processTemplates);
+//        handleDataVO.setDetailVOList(deatailMap);
+        return Result.OK(handleDataVO);
+    }
+
+
+
+  /*  @ApiOperation("查看抄送")
     @PostMapping("process/ccList")
     public Result<Page<TaskVO>> ccList(@RequestBody TaskDTO taskDTO){
         LambdaQueryWrapper<Cc> lambdaQueryWrapper = new LambdaQueryWrapper<>();
@@ -311,21 +558,7 @@ public class WorkspaceProcessController {
     }
 
 
-    private   String getCurrentName(String processInstanceId,Boolean flag,String processDefinitionId){
-        if(flag){
-            return "流程已结束";
-        }
-        List<ActivityInstance> list = runtimeService.createActivityInstanceQuery().processInstanceId(processInstanceId).activityType("userTask").unfinished().orderByActivityInstanceStartTime().desc().list();
-        if(CollUtil.isEmpty(list)){
-            return "";
-        }
-        else{
-            String activityId = list.get(0).getActivityId();
-            BpmnModel bpmnModel = repositoryService.getBpmnModel(processDefinitionId);
-            FlowElement flowElement = bpmnModel.getMainProcess().getFlowElement(activityId);
-            return flowElement.getName();
-        }
-    }
+
 
     @ApiOperation("查看我的待办")
     @PostMapping("process/toDoList")
@@ -1228,5 +1461,5 @@ public class WorkspaceProcessController {
         MinioUploadUtil minioUploadUtil = SpringContextHolder.getBean(MinioUploadUtil.class);
         minioUploadUtil.downFile(name,"java",name);
     }
-
+*/
 }

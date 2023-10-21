@@ -8,7 +8,7 @@ public interface CommonConstants {
 	Integer SC_INTERNAL_SERVER_ERROR_500 = 500;
 	/** {@code 200 OK} (HTTP/1.0 - RFC 1945) */
 	Integer SC_OK_200 = 200;
-
+	String PROCESS_NAME="processName";
 	String FORM_VAR="formData";
 	String PROCESS_STATUS="processStatus";
 	String START_USER_INFO="startUser";

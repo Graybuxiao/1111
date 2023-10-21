@@ -19,6 +19,8 @@ import com.dingding.mid.entity.ProcessTemplates;
 import com.dingding.mid.entity.TemplateGroup;
 import com.dingding.mid.entity.TemplateGroupBo;
 import com.dingding.mid.exception.WorkFlowException;
+import com.dingding.mid.flowlong.ProcessService;
+import com.dingding.mid.flowlong.core.FlowCreator;
 import com.dingding.mid.mapper.TemplateGroupMapper;
 import com.dingding.mid.service.FormGroupService;
 import com.dingding.mid.service.ProcessTemplateService;
@@ -34,13 +36,6 @@ import java.util.*;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
-import org.flowable.bpmn.BpmnAutoLayout;
-import org.flowable.bpmn.converter.BpmnXMLConverter;
-import org.flowable.bpmn.model.*;
-import org.flowable.bpmn.model.Process;
-import org.flowable.engine.RepositoryService;
-import org.flowable.engine.delegate.ExecutionListener;
-import org.flowable.engine.repository.Deployment;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,7 +43,6 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import javax.annotation.Resource;
 
-import static com.dingding.mid.utils.BpmnModelUtils.*;
 
 /**
  * @author : willian fu
@@ -68,7 +62,7 @@ public class SettingServiceImpl implements SettingService {
     @Resource
     private IdWorker idWorker;
     @Resource
-    private RepositoryService repositoryService;
+    private ProcessService processService;
 
     /**
      * 查询表单组
@@ -293,18 +287,23 @@ public class SettingServiceImpl implements SettingService {
         processTemplates.setWhoExport(adminInfo);
         processTemplates.setRemark(template.getRemark());
         processTemplates.setUpdated(new Date());
-        processTemplateService.updateById(processTemplates);
+
         ChildNode childNode = JSONObject.parseObject(template.getProcess(), new TypeReference<ChildNode>(){});
         JSONObject jsonObject=new JSONObject();
         jsonObject.put("processJson",template.getProcess());
         jsonObject.put("formJson",template.getFormItems());
-        BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, template.getRemark(),
+        FlowCreator admin = FlowCreator.ADMIN;
+        Long deploy = processService.deploy(template.getProcess(), admin, true);
+        processTemplates.setFlowLongId(deploy);
+        processTemplateService.updateById(processTemplates);
+        System.err.println(deploy);
+/*        BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, template.getRemark(),
             template.getFormName(), template.getGroupId(), template.getFormId());
         repositoryService.createDeployment()
             .addBpmnModel(template.getFormName() + ".bpmn", bpmnModel)
             .name(template.getFormName())
             .category(template.getGroupId() + "")
-            .deploy();
+            .deploy();*/
         return R.ok("发布更新后的表单成功");
     }
     @Transactional(rollbackFor = Exception.class)
@@ -340,7 +339,7 @@ public class SettingServiceImpl implements SettingService {
         Date date= new Date();
         processTemplates.setCreated(date);
         processTemplates.setUpdated(date);
-        processTemplateService.save(processTemplates);
+
         TemplateGroup templateGroup=new TemplateGroup();
         templateGroup.setTemplateId(processTemplates.getTemplateId());
         templateGroup.setGroupId(groupId);
@@ -351,6 +350,13 @@ public class SettingServiceImpl implements SettingService {
         JSONObject jsonObject=new JSONObject();
         jsonObject.put("processJson", processJson);
         jsonObject.put("formJson", formItems);
+
+        FlowCreator admin = FlowCreator.ADMIN;
+        Long deploy = processService.deploy(processJson, admin, true);
+        System.err.println(deploy);
+        processTemplates.setFlowLongId(deploy);
+        processTemplateService.save(processTemplates);
+/*
         BpmnModel bpmnModel = assemBpmnModel(jsonObject, childNode, remark, formName, groupId,
             templateId);
         repositoryService.createDeployment()
@@ -358,51 +364,9 @@ public class SettingServiceImpl implements SettingService {
             .name(formName)
             .category(groupId + "")
             .deploy();
+*/
 
 
     }
 
-    private BpmnModel assemBpmnModel(JSONObject jsonObject, ChildNode childNode, String remark,
-        String formName, Integer groupId, String templateId)
-        {
-        BpmnModel bpmnModel =new BpmnModel();
-        List<SequenceFlow> sequenceFlows = Lists.newArrayList();
-        Map<String,ChildNode> childNodeMap=new HashMap<>();
-        bpmnModel.setTargetNamespace(groupId+"");
-        ExtensionAttribute extensionAttribute=new ExtensionAttribute();
-        extensionAttribute.setName("DingDing");
-        extensionAttribute.setNamespace("http://flowable.org/bpmn");
-        extensionAttribute.setValue(jsonObject.toJSONString());
-        Process process =new Process();
-        process.setId(WorkFlowConstants.PROCESS_PREFIX+templateId);
-        process.setName(formName);
-        process.setDocumentation(remark);
-        process.addAttribute(extensionAttribute);
-        bpmnModel.addProcess(process);
-
-        StartEvent startEvent = createStartEvent();
-        process.addFlowElement(startEvent);
-            String lastNode = null;
-            try {
-                lastNode = create(startEvent.getId(), childNode,process,bpmnModel,sequenceFlows,childNodeMap);
-            } catch (InvocationTargetException e) {
-                e.printStackTrace();
-                throw new WorkFlowException("操作失败");
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-                throw new WorkFlowException("操作失败");
-            }
-            EndEvent endEvent = createEndEvent();
-        process.addFlowElement(endEvent);
-        process.addFlowElement(connect(lastNode, endEvent.getId(),sequenceFlows,childNodeMap,process));
-        List<FlowableListener> executionListeners =new ArrayList<>();
-        FlowableListener flowableListener=new FlowableListener();
-        flowableListener.setEvent(ExecutionListener.EVENTNAME_END);
-        flowableListener.setImplementationType(ImplementationType.IMPLEMENTATION_TYPE_DELEGATEEXPRESSION);
-        flowableListener.setImplementation("${processListener}");
-        executionListeners.add(flowableListener);
-        process.setExecutionListeners(executionListeners);
-        new BpmnAutoLayout(bpmnModel).execute();
-        return bpmnModel;
-    }
 }

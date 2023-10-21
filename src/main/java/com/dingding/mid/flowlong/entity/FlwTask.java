@@ -14,11 +14,11 @@
  */
 package com.dingding.mid.flowlong.entity;
 
-import com.flowlong.bpm.engine.assist.Assert;
-import com.flowlong.bpm.engine.assist.DateUtils;
-import com.flowlong.bpm.engine.core.FlowLongContext;
-import com.flowlong.bpm.engine.core.enums.PerformType;
-import com.flowlong.bpm.engine.core.enums.TaskType;
+import com.dingding.mid.flowlong.assist.Assert;
+import com.dingding.mid.flowlong.assist.DateUtils;
+import com.dingding.mid.flowlong.core.FlowLongContext;
+import com.dingding.mid.flowlong.core.enums.PerformType;
+import com.dingding.mid.flowlong.core.enums.TaskType;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;

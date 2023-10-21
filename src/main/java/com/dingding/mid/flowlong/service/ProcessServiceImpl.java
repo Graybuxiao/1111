@@ -99,7 +99,7 @@ public class ProcessServiceImpl implements ProcessService {
     public Long deploy(String jsonString, FlowCreator flowCreator, boolean repeat) {
         Assert.isNull(jsonString);
         try {
-            ProcessModel processModel = ProcessModel.parse(jsonString, null);
+             ProcessModel processModel = ProcessModel.parse(jsonString, null);
             /**
              * 查询流程信息获取最后版本号
              */

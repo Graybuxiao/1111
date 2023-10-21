@@ -14,12 +14,12 @@
  */
 package com.dingding.mid.flowlong.boot.adapter;
 
+import com.dingding.mid.flowlong.exception.FlowLongException;
+import com.dingding.mid.flowlong.handler.FlowJsonHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.flowlong.bpm.engine.exception.FlowLongException;
-import com.flowlong.bpm.engine.handler.FlowJsonHandler;
 
 /**
  * Jackson JSON 解析处理器接口

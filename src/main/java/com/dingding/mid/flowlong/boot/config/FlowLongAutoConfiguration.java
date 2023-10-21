@@ -21,6 +21,7 @@ import com.dingding.mid.flowlong.boot.adapter.SpringBootScheduler;
 import com.dingding.mid.flowlong.core.FlowLongContext;
 import com.dingding.mid.flowlong.impl.GeneralAccessStrategy;
 import com.dingding.mid.flowlong.listener.InstanceListener;
+import com.dingding.mid.flowlong.listener.TaskListener;
 import com.dingding.mid.flowlong.mapper.*;
 import com.dingding.mid.flowlong.scheduling.JobLock;
 import com.dingding.mid.flowlong.scheduling.LocalLock;
@@ -48,7 +49,8 @@ import org.springframework.context.annotation.Configuration;
  * @since 1.0
  */
 @Configuration
-@MapperScan("com.flowlong.bpm.mybatisplus.mapper")
+//@MapperScan("com.flowlong.bpm.mybatisplus.mapper")
+//@MapperScan("com.dingding.mid.mapper.CcMapper")
 @EnableConfigurationProperties(FlowLongProperties.class)
 
 @SuppressWarnings("all")

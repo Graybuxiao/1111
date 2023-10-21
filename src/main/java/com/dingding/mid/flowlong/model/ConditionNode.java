@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  */
 @Getter
 @Setter
-public class ConditionNode {
+public class ConditionNode extends BaseEx {
     /**
      * 节点名称
      */
@@ -46,7 +46,7 @@ public class ConditionNode {
     /**
      * 子节点
      */
-    private NodeModel childNode;
+//    private NodeModel childNode;
 
     /**
      * 字符串 SpEL 表达式条件

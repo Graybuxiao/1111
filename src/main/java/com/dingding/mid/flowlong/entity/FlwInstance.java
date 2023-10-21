@@ -14,7 +14,7 @@
  */
 package com.dingding.mid.flowlong.entity;
 
-import com.flowlong.bpm.engine.core.FlowLongContext;
+import com.dingding.mid.flowlong.core.FlowLongContext;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;

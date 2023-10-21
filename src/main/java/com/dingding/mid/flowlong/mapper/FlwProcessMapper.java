@@ -16,6 +16,7 @@ package com.dingding.mid.flowlong.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.dingding.mid.flowlong.entity.FlwProcess;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * 流程定义 Mapper
@@ -27,6 +28,7 @@ import com.dingding.mid.flowlong.entity.FlwProcess;
  * @author hubin
  * @since 1.0
  */
+@Mapper
 public interface FlwProcessMapper extends BaseMapper<FlwProcess> {
 
 }

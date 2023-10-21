@@ -2,7 +2,7 @@
 server:
   tomcat:
     uri-encoding: UTF-8 #tomcat编码
-  port: 9999 #tomcat端口
+  port: 15678 #tomcat端口
 
   #===================== 数据源配置 =====================
 spring:
