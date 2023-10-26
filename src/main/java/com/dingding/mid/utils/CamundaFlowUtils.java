@@ -38,16 +38,19 @@ public class CamundaFlowUtils {
     @Resource
     private HistoryService historyService;
     public List<String> calculateTaskCandidateUsers(DelegateExecution execution) {
-        if(StringUtils.isBlank(execution.getCurrentActivityId())){
-            Map<String, Object> variables = execution.getVariables();
-            Set<String> strings = variables.keySet();
-            String variableName="";
-            for (String string : strings) {
-                if(string.endsWith("AssigneeList")){
-                    variableName=string;
-                }
-            }
-            List list = MapUtil.get(variables, variableName, List.class);
+        String currentActivityId  = execution.getCurrentActivityId();
+        String activityInstanceId = execution.getActivityInstanceId();
+        if(StringUtils.isBlank(currentActivityId) && StringUtils.isNotBlank(activityInstanceId)){
+            String[] temps = activityInstanceId.split(":");
+            currentActivityId = temps[0];
+        }
+        if(StringUtils.endsWith(currentActivityId, MULTI_BODY)){
+            currentActivityId = currentActivityId.replace(MULTI_BODY,"");
+        }
+        String variable = currentActivityId + MULTI_LIST;
+        Map<String, Object> variables = execution.getVariables();
+        List list = MapUtil.get(variables, variable, List.class);
+        if(list!=null && list.size()>0){
             return list;
         }
         List<String> assigneeList = new ArrayList<>();
@@ -55,7 +58,6 @@ public class CamundaFlowUtils {
         LambdaQueryWrapper<NodeJsonData> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(NodeJsonData::getProcessDefinitionId,execution.getProcessDefinitionId());
         NodeJsonData nodeJsonData = nodeJsonDataService.getOne(lambdaQueryWrapper);
-        String currentActivityId=execution.getCurrentActivityId();
         if(StringUtils.endsWith(execution.getCurrentActivityId(),MULTI_BODY)){
             currentActivityId=currentActivityId.replace(MULTI_BODY,"");
         }
@@ -68,7 +70,6 @@ public class CamundaFlowUtils {
         Properties props = currentNode.getProps();
         String assignedType = props.getAssignedType();
         Map<String, Object> nobody = props.getNobody();
-        String variable=currentActivityId+"AssigneeList";
         if(AssigneeTypeEnums.ASSIGN_USER.getTypeName().equals(assignedType)){
             List<UserInfo> assignedUser = props.getAssignedUser();
             for (UserInfo userInfo : assignedUser) {
@@ -152,7 +153,7 @@ public class CamundaFlowUtils {
         }
 
 
-        execution.setVariableLocal(currentActivityId+"AssigneeList",assigneeList);
+        execution.setVariableLocal(variable,assigneeList);
         return assigneeList;
     }
 
