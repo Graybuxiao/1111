@@ -143,6 +143,27 @@ public class FlowLongEngineImpl implements FlowLongEngine {
     }
 
     /**
+     * 执行任务并跳转到指定节点
+     */
+    @Override
+    public void executeAndJumpNodeTask(Long taskId, String nodeName, FlowCreator flowCreator, Map<String, Object> args) {
+        // 执行当前任务
+        this.execute(taskId, flowCreator, args, execution -> {
+            ProcessModel processModel = execution.getProcess().getProcessModel();
+            Assert.isNull(processModel, "当前任务未找到流程定义模型");
+
+            // 查找模型节点
+            NodeModel nodeModel = processModel.getNode(nodeName);
+            Assert.isNull(nodeModel, "根据节点名称[" + nodeName + "]无法找到节点模型");
+
+            // 创建当前节点任务
+            nodeModel.createTask(flowLongContext, execution);
+        });
+    }
+
+
+
+    /**
      * 根据任务ID，创建人，参数列表完成任务，并且构造执行对象
      */
     protected void execute(Long taskId, FlowCreator flowCreator, Map<String, Object> args, Consumer<Execution> executeNextStep) {

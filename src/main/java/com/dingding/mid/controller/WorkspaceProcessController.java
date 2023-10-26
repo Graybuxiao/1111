@@ -4,8 +4,8 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.map.MapUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dingding.mid.common.Result;
 import com.dingding.mid.dto.*;
@@ -13,48 +13,30 @@ import com.dingding.mid.dto.json.ChildNode;
 import com.dingding.mid.dto.json.FormOperates;
 import com.dingding.mid.dto.json.SettingsInfo;
 import com.dingding.mid.dto.json.UserInfo;
-import com.dingding.mid.entity.Cc;
-import com.dingding.mid.entity.ProcessTemplates;
-import com.dingding.mid.entity.Users;
+import com.dingding.mid.entity.*;
 import com.dingding.mid.enums.RefuseEnums;
 import com.dingding.mid.exception.WorkFlowException;
-import com.dingding.mid.flowlong.FlowLongEngine;
-import com.dingding.mid.flowlong.ProcessService;
-import com.dingding.mid.flowlong.RuntimeService;
-import com.dingding.mid.flowlong.TaskService;
+import com.dingding.mid.flowlong.*;
 import com.dingding.mid.flowlong.core.FlowCreator;
+import com.dingding.mid.flowlong.core.enums.PerformType;
 import com.dingding.mid.flowlong.entity.*;
-import com.dingding.mid.flowlong.mapper.FlwHisInstanceMapper;
-import com.dingding.mid.flowlong.mapper.FlwHisTaskMapper;
-import com.dingding.mid.flowlong.mapper.FlwTaskMapper;
-import com.dingding.mid.service.CcService;
-import com.dingding.mid.service.ProcessTemplateService;
-import com.dingding.mid.service.UserService;
-import com.dingding.mid.utils.MinioUploadUtil;
+import com.dingding.mid.flowlong.mapper.*;
+import com.dingding.mid.flowlong.model.ProcessModel;
+import com.dingding.mid.service.*;
 import com.dingding.mid.utils.SpringContextHolder;
 import com.dingding.mid.vo.*;
 import com.github.xiaoymin.knife4j.annotations.ApiOperationSupport;
 import com.github.xiaoymin.knife4j.annotations.ApiSort;
 import com.sun.xml.internal.ws.api.message.Attachment;
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MinioClient;
-import io.minio.errors.*;
-import io.minio.http.Method;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import java.io.IOException;
-import java.io.InputStream;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+import javax.xml.stream.events.Comment;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -92,6 +74,16 @@ public class WorkspaceProcessController {
     private FlwTaskMapper flwTaskMapper;
     @Resource
     private FlwHisTaskMapper flwHisTaskMapper;
+    @Resource
+    private QueryService queryService;
+    @Resource
+    private FlwInstanceMapper flwInstanceMapper;
+    @Resource
+    private ProcessCommentsService processCommentsService;
+    @Resource
+    private ProcessAttachmentsService processAttachmentsService;
+    @Resource
+    private FlwTaskCcMapper flwTaskCcMapper;
 
     @ApiOperation("通过模板id查看流程信息 会附带流程定义id")
     @ApiOperationSupport(order = 1)
@@ -265,44 +257,69 @@ public class WorkspaceProcessController {
         String processInstanceId = HandleDataDTO.getProcessInstanceId();
         FlwHisInstance historicProcessInstance = flwHisInstanceMapper.selectById(processInstanceId);
         Long processId = historicProcessInstance.getProcessId();
-        LambdaQueryWrapper<ProcessTemplates> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.eq(ProcessTemplates::getFlowLongId,processId);
-        ProcessTemplates processTemplates = processTemplateService.getOne(lambdaQueryWrapper);
-        processTemplates.setLogo(processTemplates.getIcon());
-        processTemplates.setFormId(processTemplates.getTemplateId());
-        processTemplates.setFormName(processTemplates.getTemplateName());
-        processTemplates.setProcessDefinitionId(processId+"");
 
+        FlwProcess flwProcess = processService.getProcessById(processId);
+        ProcessTemplates processTemplates = new ProcessTemplates();
+        processTemplates.setLogo(flwProcess.getProcessIcon());
+        processTemplates.setFormId(flwProcess.getId()+"");
+        processTemplates.setFormName(flwProcess.getProcessName());
+
+        processTemplates.setProcessDefinitionId(processId+"");
+        String modelContent = flwProcess.getModelContent();
+        DeployDTO deployDTO = JSONObject.parseObject(modelContent, new TypeReference<DeployDTO>() {
+        });
+        processTemplates.setProcess(deployDTO.getProcessJson());
+        processTemplates.setFormItems(deployDTO.getFormJson());
+
+        ProcessModel processModel = flwProcess.getProcessModel();
+        //发起节点
+        ChildNode childNode = processModel.getNodeConfig().getWChildNode();
+        processTemplates.setFormItems(childNode.getFormJson());
         HandleDataVO handleDataVO =new HandleDataVO();
         Map<String, Object> processVariables = historicProcessInstance.getVariableMap();
 
         handleDataVO.setProcessInstanceId(historicProcessInstance.getId()+"");
-        JSONObject jsonObject = (JSONObject) processVariables.get(FORM_VAR);
+        Map map = (Map) processVariables.get(FORM_VAR);
+        JSONObject jsonObject = JSONObject.parseObject(JSONObject.toJSONString(map, SerializerFeature.WriteMapNullValue), new TypeReference<JSONObject>() {
+        });
         handleDataVO.setFormData(jsonObject);
-        String process = processTemplates.getProcess();
-        ChildNode childNode = JSONObject.parseObject(process, new TypeReference<ChildNode>(){});
-        SettingsInfo settingsInfo = JSONObject.parseObject(processTemplates.getSettings(), new TypeReference<SettingsInfo>() {});
+        String settingJson = childNode.getSettingJson();
+        SettingsInfo settingsInfo = JSONObject.parseObject(settingJson, new TypeReference<SettingsInfo>() {});
         Boolean sign = settingsInfo.getSign();
         ChildNode currentNode=null;
+
         if(StringUtils.isNotBlank(HandleDataDTO.getTaskId())){
-            FlwHisTask historicTaskInstance = flwHisTaskMapper.selectById(HandleDataDTO.getTaskId());
-//            List<FormOperates> formPerms = currentNode.getProps().getFormPerms();
-//            if(CollUtil.isNotEmpty(formPerms)){
-//                Iterator<FormOperates> iterator = formPerms.iterator();
-//                while (iterator.hasNext()){
-//                    FormOperates next = iterator.next();
-//                    if("H".equals(next.getPerm())){
-////                        iterator.remove();
-//                        if(jsonObject!=null){
-//                            jsonObject.remove(next.getId());
-//                        }
-//                    }
-//                }
-//            }
+            FlwTask historicTaskInstance = flwTaskMapper.selectById(Long.valueOf(HandleDataDTO.getTaskId()));
+            if(historicTaskInstance==null){
+                historicTaskInstance = flwHisTaskMapper.getCheckById(Long.valueOf(HandleDataDTO.getTaskId()));
+            }
+
+
+
+            currentNode = getChildNodeByNodeId(processId + "", historicTaskInstance.getTaskNodeId());
+
+
+            List<FormOperates> formPerms = currentNode.getProps().getFormPerms();
+            if(CollUtil.isNotEmpty(formPerms)){
+                Iterator<FormOperates> iterator = formPerms.iterator();
+                while (iterator.hasNext()){
+                    FormOperates next = iterator.next();
+                    if("H".equals(next.getPerm())){
+                        iterator.remove();
+                        if(jsonObject!=null){
+                            jsonObject.remove(next.getId());
+                        }
+                    }
+                }
+            }
             handleDataVO.setCurrentNode(currentNode);
             handleDataVO.setTaskId(HandleDataDTO.getTaskId());
         }
-
+        else{
+            currentNode = processModel.getNodeConfig().getWChildNode();
+            processTemplates.setFormItems(currentNode.getFormJson());
+            handleDataVO.setCurrentNode(currentNode);
+        }
         if(sign){
             handleDataVO.setSignFlag(true);
         }
@@ -322,259 +339,164 @@ public class WorkspaceProcessController {
             }
         }
 
-//        LambdaQueryWrapper<FlwHisTask>  taskLambdaQueryWrapper = new LambdaQueryWrapper<>();
-//        taskLambdaQueryWrapper.eq(FlwHisTask::getInstanceId,HandleDataDTO.getProcessInstanceId());
-//        List<FlwHisTask> list = flwHisTaskMapper.selectList(taskLambdaQueryWrapper);
-//        Map<String,List<FlwHisTask>> historicActivityInstanceMap =new HashMap<>();
-//        for (HistoricActivityInstance historicActivityInstance : list) {
-//            List<HistoricActivityInstance> historicActivityInstances = historicActivityInstanceMap.get(historicActivityInstance.getActivityId());
-//            if(historicActivityInstances==null){
-//                historicActivityInstances =new ArrayList<>();
-//                historicActivityInstances.add(historicActivityInstance);
-//                historicActivityInstanceMap.put(historicActivityInstance.getActivityId(),historicActivityInstances);
-//            }
-//            else{
-//                historicActivityInstances.add(historicActivityInstance);
-//                historicActivityInstanceMap.put(historicActivityInstance.getActivityId(),historicActivityInstances);
-//            }
-//        }
+
+
+
+        LambdaQueryWrapper<FlwHisTask>  taskLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        taskLambdaQueryWrapper.eq(FlwHisTask::getInstanceId,HandleDataDTO.getProcessInstanceId());
+        List<FlwHisTask> list = flwHisTaskMapper.selectList(taskLambdaQueryWrapper);
+        Map<String,List<FlwHisTask>> historicActivityInstanceMap =new HashMap<>();
+        for (FlwHisTask historicActivityInstance : list) {
+            List<FlwHisTask> historicActivityInstances = historicActivityInstanceMap.get(historicActivityInstance.getTaskNodeId());
+            if(historicActivityInstances==null){
+                historicActivityInstances =new ArrayList<>();
+                historicActivityInstances.add(historicActivityInstance);
+                historicActivityInstanceMap.put(historicActivityInstance.getTaskNodeId(),historicActivityInstances);
+            }
+            else{
+                historicActivityInstances.add(historicActivityInstance);
+                historicActivityInstanceMap.put(historicActivityInstance.getTaskNodeId(),historicActivityInstances);
+            }
+        }
+
+
 //
 //        Process mainProcess = repositoryService.getBpmnModel(historicProcessInstance.getProcessDefinitionId()).getMainProcess();
 //        Collection<FlowElement> flowElements = mainProcess.getFlowElements();
 //
-//        List<String> runningList= new ArrayList<>();
-//        handleDataVO.setRunningList(runningList);
-//        List<String> endList=new ArrayList<>();
-//        handleDataVO.setEndList(endList);
-//        List<String> noTakeList=new ArrayList<>();
-//        handleDataVO.setNoTakeList(noTakeList);
-//        Map<String,List<TaskDetailVO>> deatailMap =new HashMap<>();
-//        List<Comment> processInstanceComments = taskService.getProcessInstanceComments(historicProcessInstance.getId());
-//        List<Attachment> processInstanceAttachments = taskService.getProcessInstanceAttachments(historicProcessInstance.getId());
-//        for (FlowElement flowElement : flowElements) {
-//            List<TaskDetailVO> detailVOList =new ArrayList<>();
-//            List<HistoricActivityInstance> historicActivityInstanceList = historicActivityInstanceMap.get(flowElement.getId());
-//            if(CollUtil.isNotEmpty(historicActivityInstanceList)){
-//                for (HistoricActivityInstance historicActivityInstance : historicActivityInstanceList) {
-//                    if(historicActivityInstance.getEndTime()!=null){
-//                        if("startEvent".equalsIgnoreCase(historicActivityInstance.getActivityType()) ||"endEvent".equalsIgnoreCase(historicActivityInstance.getActivityType())){
-//                            TaskDetailVO taskDetailVO = new TaskDetailVO();
-//                            taskDetailVO.setActivityId(historicActivityInstance.getActivityId());
-//                            taskDetailVO.setName(historicActivityInstance.getActivityName());
-//                            taskDetailVO.setCreateTime(historicActivityInstance.getStartTime());
-//                            taskDetailVO.setEndTime(historicActivityInstance.getEndTime());
-//                            detailVOList.add(taskDetailVO);
-//                            deatailMap.put(historicActivityInstance.getActivityId(),detailVOList);
-//                            endList.add(historicActivityInstance.getActivityId());
-//                        }
-//                        else if ("userTask".equalsIgnoreCase(historicActivityInstance.getActivityType())){
-//                            List<TaskDetailVO> voList = deatailMap.get(historicActivityInstance.getActivityId());
-//                            List<HistoricActivityInstance> activityInstanceList = list.stream().filter(h -> h.getActivityId().equals(historicActivityInstance.getActivityId()) &&h.getEndTime()!=null).collect(Collectors.toList());
-//                            if(voList!=null){
-//                                collectUserTaskInfo(processInstanceComments, processInstanceAttachments, historicActivityInstance, voList, activityInstanceList);
-//                            }
-//                            else{
-//                                voList=new ArrayList<>();
-//                                collectUserTaskInfo(processInstanceComments, processInstanceAttachments, historicActivityInstance, voList, activityInstanceList);
-//                            }
-//                            deatailMap.put(historicActivityInstance.getActivityId(),voList);
-//                            endList.add(historicActivityInstance.getActivityId());
-//                        }
-//                        else if("serviceTask".equalsIgnoreCase(historicActivityInstance.getActivityType())){
-//
-//                        }
-//                    }
-//                    else{
-//                        if ("userTask".equalsIgnoreCase(historicActivityInstance.getActivityType())){
-//                            List<TaskDetailVO> voList = deatailMap.get(historicActivityInstance.getActivityId());
-//                            List<HistoricActivityInstance> activityInstanceList = list.stream().filter(h -> h.getActivityId().equals(historicActivityInstance.getActivityId()) &&h.getEndTime()==null).collect(Collectors.toList());
-//                            if(voList!=null){
-//                                collectUserTaskInfo(processInstanceComments, processInstanceAttachments, historicActivityInstance, voList, activityInstanceList);
-//                            }
-//                            else{
-//                                voList=new ArrayList<>();
-//                                collectUserTaskInfo(processInstanceComments, processInstanceAttachments, historicActivityInstance, voList, activityInstanceList);
-//                            }
-//                            deatailMap.put(historicActivityInstance.getActivityId(),voList);
-//                            if(endList.contains(historicActivityInstance.getActivityId())){
-//                                endList.remove(historicActivityInstance.getActivityId());
-//                                runningList.add(historicActivityInstance.getActivityId());
-//                            }
-//                            else{
-//                                runningList.add(historicActivityInstance.getActivityId());
-//                            }
-//                        }
-//                        else if("serviceTask".equalsIgnoreCase(historicActivityInstance.getActivityType())){
-//
-//                        }
-//                    }
-//                }
-//            }
-//            else{
-//                noTakeList.add(flowElement.getId());
-//            }
-//        }
+
+
+        List<String> runningList= new ArrayList<>();
+
+        Optional<List<FlwTask>> activeTasksByInstanceId = queryService.getActiveTasksByInstanceId(historicProcessInstance.getId());
+        List<FlwTask> flwTaskList = activeTasksByInstanceId.get();
+        if(CollUtil.isNotEmpty(flwTaskList)){
+            for (FlwTask task : flwTaskList) {
+                runningList.add(task.getTaskNodeId());
+            }
+        }
+
+        handleDataVO.setRunningList(runningList);
+        List<String> endList=new ArrayList<>();
+        handleDataVO.setEndList(endList);
+        List<String> noTakeList=new ArrayList<>();
+        handleDataVO.setNoTakeList(noTakeList);
+
+
+
+        Map<String, ChildNode> childNodeReturnMap = getChildNodeReturnMap(childNode);
+        Set<String> mapKeys = childNodeReturnMap.keySet();
+        mapKeys.removeAll(runningList);
+        mapKeys.removeAll(endList);
+        handleDataVO.setNoTakeList(CollUtil.newArrayList(mapKeys));
+        //具体操作
+        Set<String> strings = historicActivityInstanceMap.keySet();
+        //
+        for (String string : strings) {
+            //
+            List<FlwHisTask> flwHisTasks = historicActivityInstanceMap.get(string);
+            for (FlwHisTask flwHisTask : flwHisTasks) {
+                if(flwHisTask.getFinishTime()==null){
+                    runningList.add(flwHisTask.getTaskNodeId());
+                    break;
+                }
+                else{
+                    endList.add(flwHisTask.getTaskNodeId());
+                }
+            }
+
+
+        }
+
+
         handleDataVO.setProcessTemplates(processTemplates);
-//        handleDataVO.setDetailVOList(deatailMap);
+        handleDataVO.setDetailVOList(new HashMap<>());
         return Result.OK(handleDataVO);
     }
 
-
-
-  /*  @ApiOperation("查看抄送")
-    @PostMapping("process/ccList")
-    public Result<Page<TaskVO>> ccList(@RequestBody TaskDTO taskDTO){
-        LambdaQueryWrapper<Cc> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.eq(Cc::getUserId,taskDTO.getCurrentUserInfo().getId());
-        Page page= new Page();
-        page.setCurrent(taskDTO.getPageNo());
-        page.setSize(taskDTO.getPageSize());
-        Page page1 = ccService.page(page, lambdaQueryWrapper);
-        List<Cc> ccList = page1.getRecords();
-        if(CollUtil.isNotEmpty(ccList)){
-            Set<String> processInstanceIds= new HashSet<>();
-            for (Cc cc : ccList) {
-                processInstanceIds.add(cc.getProcessInstanceId());
+    private  static  void getChildNode(ChildNode childNode,Map<String,ChildNode> childNodeMap){
+        childNodeMap.put(childNode.getId(),childNode);
+        List<ChildNode> branchs = childNode.getBranchs();
+        ChildNode children = childNode.getChildren();
+        if(branchs!=null && branchs.size()>0){
+            for (ChildNode branch : branchs) {
+                if(StringUtils.isNotBlank(branch.getId())){
+                    childNodeMap.put(branch.getId(),branch);
+                    getChildNode(branch,childNodeMap);
+                }
             }
-            List<HistoricProcessInstance> processInstanceList = historyService.createHistoricProcessInstanceQuery().processInstanceIds(processInstanceIds).includeProcessVariables().list();
-            Map<String,HistoricProcessInstance> map =new HashMap<>();
-            for (HistoricProcessInstance historicProcessInstance : processInstanceList) {
-                map.put(historicProcessInstance.getId(),historicProcessInstance);
-            }
-
-            List<String> applyUserIds= new ArrayList<>();
-            for (HistoricProcessInstance historicProcessInstance : processInstanceList) {
-                Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
-                String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
-                }).getId();
-                applyUserIds.add(id);
-            }
-            Map<Long, Users> collect=new HashMap<>();
-            if(CollUtil.isNotEmpty(applyUserIds)){
-                LambdaQueryWrapper<Users> userLambdaQueryWrapper = new LambdaQueryWrapper<>();
-                userLambdaQueryWrapper.in(Users::getUserId,applyUserIds);
-                List<Users> list = userService.list(userLambdaQueryWrapper);
-                collect = list.stream().collect(Collectors.toMap(Users::getUserId, Function.identity()));
-            }
-
-
-
-            for (Cc cc : ccList) {
-                HistoricProcessInstance historicProcessInstance = map.get(cc.getProcessInstanceId());
-                Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
-                cc.setProcessInstanceId(historicProcessInstance.getId());
-                cc.setProcessDefinitionName(historicProcessInstance.getProcessDefinitionName());
-                cc.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
-                cc.setUsers(collect.get(Long.valueOf(cc.getStartUser().getId())));
-                cc.setStartTime(historicProcessInstance.getStartTime());
-                cc.setEndTime(historicProcessInstance.getEndTime());
-                Boolean flag= historicProcessInstance.getEndTime() != null;
-                cc.setCurrentActivityName(getCurrentName(historicProcessInstance.getId(),flag,historicProcessInstance.getProcessDefinitionId()));
-                cc.setBusinessStatus(MapUtil.getStr(processVariables,PROCESS_STATUS));
-
-
-                long totalTimes = historicProcessInstance.getEndTime()==null?
-                        (Calendar.getInstance().getTimeInMillis()-historicProcessInstance.getStartTime().getTime()):
-                        (historicProcessInstance.getEndTime().getTime()-historicProcessInstance.getStartTime().getTime());
-                long dayCount = totalTimes /(1000*60*60*24);//计算天
-                long restTimes = totalTimes %(1000*60*60*24);//剩下的时间用于计于小时
-                long hourCount = restTimes/(1000*60*60);//小时
-                restTimes = restTimes % (1000*60*60);
-                long minuteCount = restTimes / (1000*60);
-
-                String spendTimes = dayCount+"天"+hourCount+"小时"+minuteCount+"分";
-                cc.setDuration(spendTimes);
-
-            }
-
-
         }
-        return Result.OK(page1);
+
+        if(children!=null ){
+            childNodeMap.put(children.getId(),children);
+            getChildNode(children,childNodeMap);
+        }
+
+    }
+    public static ChildNode getChildNodeByNodeId(String processDefinitionId,String currentActivityId){
+        ProcessService service = SpringContextHolder.getBean(ProcessService.class);
+        ProcessModel processModel = service.getProcessById(Long.valueOf(processDefinitionId)).getProcessModel();
+
+        //发起节点
+        ChildNode childNode = processModel.getNodeConfig().getWChildNode();
+        return getChildNode(childNode, currentActivityId);
+    }
+
+    public static   Map<String,ChildNode> getChildNodeReturnMap(ChildNode childNode){
+        Map<String,ChildNode> childNodeMap =new HashMap<>();
+        if(StringUtils.isNotBlank(childNode.getId())){
+            getChildNode(childNode,childNodeMap);
+        }
+        return childNodeMap;
     }
 
 
-
-    @ApiOperation("查看我发起的流程")
-    @ApiOperationSupport(order = 3)
-    @PostMapping("process/applyList")
-    public Result< Page<HistoryProcessInstanceVO>> applyList(@RequestBody ApplyDTO applyDTO){
-        List<HistoricProcessInstance> historicProcessInstances =
-                historyService.createHistoricProcessInstanceQuery()
-                .includeProcessVariables()
-                .startedBy(applyDTO.getCurrentUserInfo().getId())
-                .orderByProcessInstanceStartTime().desc()
-                .listPage((applyDTO.getPageNo() - 1) * applyDTO.getPageSize(), applyDTO.getPageSize());
-        long count = historyService.createHistoricProcessInstanceQuery()
-                .startedBy(applyDTO.getCurrentUserInfo().getId()).count();
-        List<String> applyUserIds= new ArrayList<>();
-        for (HistoricProcessInstance historicProcessInstance : historicProcessInstances) {
-            Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
-            String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
-            }).getId();
-            applyUserIds.add(id);
-        }
-        Map<Long, Users> collect=new HashMap<>();
-        if(CollUtil.isNotEmpty(applyUserIds)){
-            LambdaQueryWrapper<Users> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-            lambdaQueryWrapper.in(Users::getUserId,applyUserIds);
-            List<Users> list = userService.list(lambdaQueryWrapper);
-            collect = list.stream().collect(Collectors.toMap(Users::getUserId, Function.identity()));
+    public static  ChildNode getChildNode(ChildNode childNode,String nodeId){
+        Map<String,ChildNode> childNodeMap =new HashMap<>();
+        if(StringUtils.isNotBlank(childNode.getId())){
+            getChildNode(childNode,childNodeMap);
         }
 
-        List<HistoryProcessInstanceVO> historyProcessInstanceVOS= new ArrayList<>();
-        Page<HistoryProcessInstanceVO> page=new Page<>();
-        for (HistoricProcessInstance historicProcessInstance : historicProcessInstances) {
-            Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
-            HistoryProcessInstanceVO historyProcessInstanceVO=new HistoryProcessInstanceVO();
-            historyProcessInstanceVO.setProcessInstanceId(historicProcessInstance.getId());
-            historyProcessInstanceVO.setProcessDefinitionName(historicProcessInstance.getProcessDefinitionName());
-            historyProcessInstanceVO.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
-            historyProcessInstanceVO.setUsers(collect.get(Long.valueOf(historyProcessInstanceVO.getStartUser().getId())));
-            historyProcessInstanceVO.setStartTime(historicProcessInstance.getStartTime());
-            historyProcessInstanceVO.setEndTime(historicProcessInstance.getEndTime());
-            Boolean flag= historicProcessInstance.getEndTime() != null;
-            historyProcessInstanceVO.setCurrentActivityName(getCurrentName(historicProcessInstance.getId(),flag,historicProcessInstance.getProcessDefinitionId()));
-            historyProcessInstanceVO.setBusinessStatus(MapUtil.getStr(processVariables,PROCESS_STATUS));
-
-
-            long totalTimes = historicProcessInstance.getEndTime()==null?
-                    (Calendar.getInstance().getTimeInMillis()-historicProcessInstance.getStartTime().getTime()):
-                    (historicProcessInstance.getEndTime().getTime()-historicProcessInstance.getStartTime().getTime());
-            long dayCount = totalTimes /(1000*60*60*24);//计算天
-            long restTimes = totalTimes %(1000*60*60*24);//剩下的时间用于计于小时
-            long hourCount = restTimes/(1000*60*60);//小时
-            restTimes = restTimes % (1000*60*60);
-            long minuteCount = restTimes / (1000*60);
-
-            String spendTimes = dayCount+"天"+hourCount+"小时"+minuteCount+"分";
-            historyProcessInstanceVO.setDuration(spendTimes);
-            historyProcessInstanceVOS.add(historyProcessInstanceVO);
+        Set<String> set = childNodeMap.keySet();
+        for (String s : set) {
+            if(StringUtils.isNotBlank(s)){
+                if(s.equals(nodeId)){
+                    return childNodeMap.get(s);
+                }
+            }
         }
-        page.setRecords(historyProcessInstanceVOS);
-        page.setCurrent(applyDTO.getPageNo());
-        page.setSize(applyDTO.getPageSize());
-        page.setTotal(count);
-        return Result.OK(page);
+        return null;
     }
+    @ApiOperation("查看我的待领任务")
+    @PostMapping("process/claimList")
+    public Result<Page<TaskVO>> claimList(@RequestBody TaskDTO taskDTO){
+        List<FlwTask> flwTasks = flwTaskMapper.todoTask(taskDTO.getCurrentUserInfo().getId());
+//        LambdaQueryWrapper<FlwTask> flwTaskLambdaQueryWrapper= new LambdaQueryWrapper<>();
+//        flwTaskLambdaQueryWrapper.eq(FlwTask::getAssignorId,taskDTO.getCurrentUserInfo().getId());
 
-
-
-
-    @ApiOperation("查看我的待办")
-    @PostMapping("process/toDoList")
-    public Result<Page<TaskVO>> toDoList(@RequestBody TaskDTO taskDTO){
-        List<Task> tasks = taskService.createTaskQuery().taskAssignee(taskDTO.getCurrentUserInfo().getId())
-                .includeProcessVariables()
-                .orderByTaskCreateTime().desc()
-                .listPage((taskDTO.getPageNo() - 1) * taskDTO.getPageSize(), taskDTO.getPageSize());
-        long count = taskService.createTaskQuery().taskAssignee(taskDTO.getCurrentUserInfo().getId()).count();
+//        List<FlwTask> flwTasks = flwTaskMapper.selectList(flwTaskLambdaQueryWrapper);
+        long count = flwTasks.size();
         List<TaskVO> taskVOS= new ArrayList<>();
         Page<TaskVO> page =new Page<>();
 
 
+
         List<String> taskIds= new ArrayList<>();
-        for (Task task : tasks) {
-            Map<String, Object> processVariables = task.getProcessVariables();
+        List<Long> instanceIds=new ArrayList<>();
+        Map<Long,FlwInstance> flwInstanceMap = new HashMap<>();
+        for (FlwTask flwTask : flwTasks) {
+            instanceIds.add(flwTask.getInstanceId());
+        }
+        LambdaQueryWrapper<FlwInstance> flwInstanceLambdaQueryWrapper= new LambdaQueryWrapper<>();
+        flwInstanceLambdaQueryWrapper.in(FlwInstance::getId,instanceIds);
+        List<FlwInstance> flwInstances = flwInstanceMapper.selectList(flwInstanceLambdaQueryWrapper);
+        for (FlwInstance flwInstance : flwInstances) {
+            flwInstanceMap.put(flwInstance.getId(),flwInstance);
+        }
+        for (FlwTask task : flwTasks) {
+            Long instanceId = task.getInstanceId();
+            FlwInstance flwInstance = flwInstanceMap.get(instanceId);
+            Map<String, Object> processVariables = flwInstance.getVariableMap();
             String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
             }).getId();
             taskIds.add(id);
@@ -589,25 +511,238 @@ public class WorkspaceProcessController {
             collect = list.stream().collect(Collectors.toMap(Users::getUserId, Function.identity()));
         }
 
-        for (Task task : tasks) {
-            ProcessInstance processInstance = runtimeService.createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
-            BpmnModel bpmnModel = repositoryService.getBpmnModel(task.getProcessDefinitionId());
-            Map<String, Object> processVariables = task.getProcessVariables();
+        for (FlwTask task : flwTasks) {
+            FlwInstance processInstance = flwInstanceMap.get(task.getInstanceId());
+            Map<String, Object> processVariables = processInstance.getVariableMap();
             TaskVO taskVO=new TaskVO();
-            taskVO.setTaskId(task.getId());
-            taskVO.setProcessInstanceId(task.getProcessInstanceId());
-            taskVO.setProcessDefinitionName(bpmnModel.getMainProcess().getName());
+            taskVO.setTaskId(task.getId()+"");
+            taskVO.setProcessInstanceId(task.getInstanceId()+"");
+            String name = processService.getProcessById(processInstance.getProcessId()).getProcessModel().getName();
+            taskVO.setProcessDefinitionName(name);
             taskVO.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
             taskVO.setUsers(collect.get(Long.valueOf(taskVO.getStartUser().getId())));
-            taskVO.setStartTime(processInstance.getStartTime());
-            taskVO.setCurrentActivityName(getCurrentName(processInstance.getId(),false,processInstance.getProcessDefinitionId()));
+            taskVO.setStartTime(processInstance.getCreateTime());
+
+            taskVO.setCurrentActivityName(getCurrentName(processInstance.getId()+"",false));
 
             taskVO.setBusinessStatus(MapUtil.getStr(processVariables,PROCESS_STATUS));
             taskVO.setTaskCreatedTime(task.getCreateTime());
-            DelegationState delegationState = task.getDelegationState();
-            if(delegationState!=null){
-                taskVO.setDelegationState(delegationState);
+//            DelegationState delegationState = task.getDelegationState();
+//            if(delegationState!=null){
+//                taskVO.setDelegationState(delegationState);
+//            }
+            taskVOS.add(taskVO);
+
+        }
+        page.setRecords(taskVOS);
+        page.setCurrent(taskDTO.getPageNo());
+        page.setSize(taskDTO.getPageSize());
+        page.setTotal(count);
+        return Result.OK(page);
+    }
+
+    @ApiOperation("认领任务")
+    @PostMapping("/claimTask")
+    public Result claimTask(@RequestBody HandleDataDTO handleDataDTO){
+        UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
+        List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
+        String comments = handleDataDTO.getComments();
+        JSONObject formData = handleDataDTO.getFormData();
+        String taskId = handleDataDTO.getTaskId();
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
+        Map<String,Object> map=new HashMap<>();
+        if(formData!=null &&formData.size()>0){
+            Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
+            });
+            map.putAll(formValue);
+            map.put(FORM_VAR,formData);
+        }
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
+        if(StringUtils.isNotBlank(comments)){
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
+        }
+        if(attachments!=null && attachments.size()>0){
+            for (AttachmentDTO attachment : attachments) {
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
+        }
+
+        if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
+        }
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
+        }
+
+
+        UserInfo delegateUserInfo = handleDataDTO.getDelegateUserInfo();
+        FlwHisTaskActor taskActor = (FlwHisTaskActor) FlwHisTaskActor.ofUser(delegateUserInfo.getId(), delegateUserInfo.getName());
+        taskService.claim(task.getId(),taskActor);
+        return Result.OK();
+    }
+    //todo 按照flowlong设计,没有办法做到反认领,因为他把actor都删了
+    @ApiOperation("反认领任务")
+//    @PostMapping("/unClaimTask")
+    public Result unClaimTask(@RequestBody HandleDataDTO handleDataDTO){
+        UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
+        List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
+        String comments = handleDataDTO.getComments();
+        JSONObject formData = handleDataDTO.getFormData();
+        String taskId = handleDataDTO.getTaskId();
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
+        Map<String,Object> map=new HashMap<>();
+        if(formData!=null &&formData.size()>0){
+            Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
+            });
+            map.putAll(formValue);
+            map.put(FORM_VAR,formData);
+        }
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
+        if(StringUtils.isNotBlank(comments)){
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
+        }
+        if(attachments!=null && attachments.size()>0){
+            for (AttachmentDTO attachment : attachments) {
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
+            }
+        }
+
+        if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
+        }
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
+        }
+
+
+        UserInfo delegateUserInfo = handleDataDTO.getDelegateUserInfo();
+        FlwTaskActor flwTaskActor = FlwTaskActor.ofUser(delegateUserInfo.getId(), delegateUserInfo.getName());
+//        taskService.(task.getId(),flwTaskActor);
+        return Result.OK();
+    }
+
+
+    @ApiOperation("查看我的待办")
+    @PostMapping("process/toDoList")
+    public Result<Page<TaskVO>> toDoList(@RequestBody TaskDTO taskDTO){
+        LambdaQueryWrapper<FlwTask> flwTaskLambdaQueryWrapper= new LambdaQueryWrapper<>();
+        flwTaskLambdaQueryWrapper.eq(FlwTask::getAssignorId,taskDTO.getCurrentUserInfo().getId());
+
+        List<FlwTask> flwTasks = flwTaskMapper.selectList(flwTaskLambdaQueryWrapper);
+        long count = flwTasks.size();
+        List<TaskVO> taskVOS= new ArrayList<>();
+        Page<TaskVO> page =new Page<>();
+
+
+
+        List<String> taskIds= new ArrayList<>();
+        List<Long> instanceIds=new ArrayList<>();
+        Map<Long,FlwInstance> flwInstanceMap = new HashMap<>();
+        for (FlwTask flwTask : flwTasks) {
+            instanceIds.add(flwTask.getInstanceId());
+        }
+        LambdaQueryWrapper<FlwInstance> flwInstanceLambdaQueryWrapper= new LambdaQueryWrapper<>();
+        flwInstanceLambdaQueryWrapper.in(FlwInstance::getId,instanceIds);
+        List<FlwInstance> flwInstances = flwInstanceMapper.selectList(flwInstanceLambdaQueryWrapper);
+        for (FlwInstance flwInstance : flwInstances) {
+            flwInstanceMap.put(flwInstance.getId(),flwInstance);
+        }
+        for (FlwTask task : flwTasks) {
+            Long instanceId = task.getInstanceId();
+            FlwInstance flwInstance = flwInstanceMap.get(instanceId);
+            Map<String, Object> processVariables = flwInstance.getVariableMap();
+            String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
+            }).getId();
+            taskIds.add(id);
+        }
+
+
+        Map<Long, Users> collect=new HashMap<>();
+        if(CollUtil.isNotEmpty(taskIds)){
+            LambdaQueryWrapper<Users> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+            lambdaQueryWrapper.in(Users::getUserId,taskIds);
+            List<Users> list = userService.list(lambdaQueryWrapper);
+            collect = list.stream().collect(Collectors.toMap(Users::getUserId, Function.identity()));
+        }
+
+        for (FlwTask task : flwTasks) {
+            FlwInstance processInstance = flwInstanceMap.get(task.getInstanceId());
+            Map<String, Object> processVariables = processInstance.getVariableMap();
+            TaskVO taskVO=new TaskVO();
+            taskVO.setTaskId(task.getId()+"");
+            taskVO.setProcessInstanceId(task.getInstanceId()+"");
+            String name = processService.getProcessById(processInstance.getProcessId()).getProcessModel().getName();
+            taskVO.setProcessDefinitionName(name);
+            taskVO.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
+            taskVO.setUsers(collect.get(Long.valueOf(taskVO.getStartUser().getId())));
+            taskVO.setStartTime(processInstance.getCreateTime());
+
+            taskVO.setCurrentActivityName(getCurrentName(processInstance.getId()+"",false));
+
+            taskVO.setBusinessStatus(MapUtil.getStr(processVariables,PROCESS_STATUS));
+            taskVO.setTaskCreatedTime(task.getCreateTime());
+//            DelegationState delegationState = task.getDelegationState();
+//            if(delegationState!=null){
+//                taskVO.setDelegationState(delegationState);
+//            }
             taskVOS.add(taskVO);
 
         }
@@ -621,55 +756,55 @@ public class WorkspaceProcessController {
     @ApiOperation("查看我的已办")
     @PostMapping("process/doneList")
     public Result<Page<TaskVO>> doneList(@RequestBody TaskDTO taskDTO){
-        List<HistoricTaskInstance> tasks = historyService.createHistoricTaskInstanceQuery()
-                .taskAssignee(taskDTO.getCurrentUserInfo().getId())
-                .finished()
-                .includeProcessVariables()
-                .orderByTaskCreateTime().desc()
-                .listPage((taskDTO.getPageNo() - 1) * taskDTO.getPageSize(), taskDTO.getPageSize());
-        long count = historyService.createHistoricTaskInstanceQuery()
-                .taskAssignee(taskDTO.getCurrentUserInfo().getId()).finished().count();
-        List<TaskVO> taskVOS= new ArrayList<>();
-        Page<TaskVO> page =new Page<>();
+        LambdaQueryWrapper<FlwHisTask> flwHisTaskLambdaQueryWrapper  = new LambdaQueryWrapper<>();
+        flwHisTaskLambdaQueryWrapper.eq(FlwHisTask::getAssignorId,taskDTO.getCurrentUserInfo().getId())
+                .isNotNull(FlwHisTask::getFinishTime);
+        List<FlwHisTask> flwHisTasks = flwHisTaskMapper.selectList(flwHisTaskLambdaQueryWrapper);
+        Page<TaskVO> page=new Page<>();
 
+        List<TaskVO> taskVOS= new ArrayList<>();
+        Map<Long, Users> collect=new HashMap<>();
         List<String> taskIds= new ArrayList<>();
-        for (HistoricTaskInstance task : tasks) {
-            Map<String, Object> processVariables = task.getProcessVariables();
+        List<Long> instanceIds=new ArrayList<>();
+        Map<Long,FlwHisInstance> flwInstanceMap = new HashMap<>();
+        for (FlwTask flwTask : flwHisTasks) {
+            instanceIds.add(flwTask.getInstanceId());
+        }
+        LambdaQueryWrapper<FlwHisInstance> flwInstanceLambdaQueryWrapper= new LambdaQueryWrapper<>();
+        flwInstanceLambdaQueryWrapper.in(FlwHisInstance::getId,instanceIds);
+        List<FlwHisInstance> flwInstances = flwHisInstanceMapper.selectList(flwInstanceLambdaQueryWrapper);
+        for (FlwHisInstance flwInstance : flwInstances) {
+            flwInstanceMap.put(flwInstance.getId(),flwInstance);
+        }
+        for (FlwTask task : flwHisTasks) {
+            Long instanceId = task.getInstanceId();
+            FlwInstance flwInstance = flwInstanceMap.get(instanceId);
+            Map<String, Object> processVariables = flwInstance.getVariableMap();
             String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
             }).getId();
             taskIds.add(id);
         }
 
 
-        Map<Long, Users> collect=new HashMap<>();
-        if(CollUtil.isNotEmpty(taskIds)){
-            LambdaQueryWrapper<Users> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-            lambdaQueryWrapper.in(Users::getUserId,taskIds);
-            List<Users> list = userService.list(lambdaQueryWrapper);
-            collect = list.stream().collect(Collectors.toMap(Users::getUserId, Function.identity()));
-        }
-
-
-        for (HistoricTaskInstance task : tasks) {
-            HistoricProcessInstance historicProcessInstance = historyService.createHistoricProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult();
-            Boolean flag=historicProcessInstance.getEndTime()==null?false:true;
-            BpmnModel bpmnModel = repositoryService.getBpmnModel(task.getProcessDefinitionId());
-            Map<String, Object> processVariables = task.getProcessVariables();
+        for (FlwHisTask task : flwHisTasks) {
+            FlwHisInstance processInstance = flwInstanceMap.get(task.getInstanceId());
+            Map<String, Object> processVariables = processInstance.getVariableMap();
             TaskVO taskVO=new TaskVO();
-            taskVO.setTaskId(task.getId());
-            taskVO.setTaskName(task.getName());
-            taskVO.setProcessInstanceId(task.getProcessInstanceId());
-            taskVO.setProcessDefinitionName(bpmnModel.getMainProcess().getName());
+            taskVO.setTaskId(task.getId()+"");
+            taskVO.setTaskName(task.getTaskName());
+            String name = processService.getProcessById(processInstance.getProcessId()).getProcessModel().getName();
+            taskVO.setProcessDefinitionName(name);
             taskVO.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
             taskVO.setUsers(collect.get(Long.valueOf(taskVO.getStartUser().getId())));
-            taskVO.setStartTime(historicProcessInstance.getStartTime());
-            taskVO.setCurrentActivityName(getCurrentName(task.getProcessInstanceId(),flag,task.getProcessDefinitionId()));
+            taskVO.setStartTime(processInstance.getCreateTime());
+            Boolean flag= processInstance.getEndTime() != null;
+            taskVO.setCurrentActivityName(getCurrentName(processInstance.getId()+"",flag));
             taskVO.setBusinessStatus(MapUtil.getStr(processVariables,PROCESS_STATUS));
-            taskVO.setEndTime(task.getEndTime());
+            taskVO.setEndTime(task.getFinishTime());
 
-            long totalTimes = task.getEndTime()==null?
-                    (Calendar.getInstance().getTimeInMillis()-task.getStartTime().getTime()):
-                    (task.getEndTime().getTime()-task.getStartTime().getTime());
+            long totalTimes = task.getFinishTime()==null?
+                    (Calendar.getInstance().getTimeInMillis()-task.getCreateTime().getTime()):
+                    (task.getFinishTime().getTime()-task.getCreateTime().getTime());
             long dayCount = totalTimes /(1000*60*60*24);//计算天
             long restTimes = totalTimes %(1000*60*60*24);//剩下的时间用于计于小时
             long hourCount = restTimes/(1000*60*60);//小时
@@ -683,22 +818,21 @@ public class WorkspaceProcessController {
         page.setRecords(taskVOS);
         page.setCurrent(taskDTO.getPageNo());
         page.setSize(taskDTO.getPageSize());
-        page.setTotal(count);
+        page.setTotal(flwHisTasks.size());
         return Result.OK(page);
     }
-
     @ApiOperation("同意按钮")
     @PostMapping("/agree")
-    public Result agree(@RequestBody HandleDataDTO handleDataDTO,MultipartFile file){
+    public Result agree(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
-        if(DelegationState.PENDING.equals(task.getDelegationState())){
-            return Result.error("委派人不可以点击同意按钮,而应该点击 委派人完成按钮");
-        }
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
+//        if(DelegationState.PENDING.equals(task.getDelegationState())){
+//            return Result.error("委派人不可以点击同意按钮,而应该点击 委派人完成按钮");
+//        }
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
@@ -707,26 +841,59 @@ public class WorkspaceProcessController {
             map.put(FORM_VAR,formData);
         }
 
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        runtimeService.addVariable(task.getInstanceId(),map);
+
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
+        }
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
         }
 
-
-        taskService.complete(task.getId());
+        FlowCreator flowCreator = FlowCreator.of(currentUserInfo.getId(), currentUserInfo.getName());
+//        taskService.complete(task.getId(),flowCreator);
+        flowLongEngine.executeTask(task.getId(),flowCreator);
+//        flowLongEngine.executeAndJumpTask();
         return Result.OK();
     }
-
     @ApiOperation("委派按钮")
     @PostMapping("/delegateTask")
     public Result delegateTask(@RequestBody HandleDataDTO handleDataDTO){
@@ -735,7 +902,7 @@ public class WorkspaceProcessController {
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
@@ -744,35 +911,78 @@ public class WorkspaceProcessController {
             map.put(FORM_VAR,formData);
         }
 
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
+        }
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
         }
 
         UserInfo delegateUserInfo = handleDataDTO.getDelegateUserInfo();
-        taskService.delegateTask(task.getId(),delegateUserInfo.getId());
+
+        FlwTaskActor flwTaskActor1 = FlwHisTaskActor.ofUser(currentUserInfo.getId(), currentUserInfo.getName());
+        flwTaskActor1.setTaskId(task.getId());
+        flwTaskActor1.setInstanceId(task.getInstanceId());
+        flwTaskActor1.setActorType(0);
+        FlwHisTaskActor currentActor = FlwHisTaskActor.of(flwTaskActor1);
+        FlwTaskActor flwTaskActor = FlwHisTaskActor.ofUser(delegateUserInfo.getId(), delegateUserInfo.getName());
+        flwTaskActor.setTaskId(task.getId());
+        flwTaskActor.setInstanceId(task.getInstanceId());
+        flwTaskActor.setActorType(0);
+        //todo 委派代码实现有问题, 另议
+        FlwHisTaskActor deletegateActor = FlwHisTaskActor.of(flwTaskActor);
+        taskService.delegateTask(task.getId(),currentActor,deletegateActor);
         return Result.OK();
     }
 
     @ApiOperation("委派人完成的按钮")
-    @PostMapping("/resolveTask")
+//    @PostMapping("/resolveTask")
     public Result resolveTask(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
@@ -781,36 +991,66 @@ public class WorkspaceProcessController {
             map.put(FORM_VAR,formData);
         }
 
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
+        }
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
         }
 
-        taskService.resolveTask(taskId);
+        FlowCreator flowCreator = FlowCreator.of(currentUserInfo.getId(), currentUserInfo.getName());
+        taskService.complete(task.getId(),flowCreator);
         return Result.OK();
     }
-
 
     @ApiOperation("拒绝按钮")
     @PostMapping("/refuse")
     public Result refuse(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
@@ -818,58 +1058,97 @@ public class WorkspaceProcessController {
             map.putAll(formValue);
             map.put(FORM_VAR,formData);
         }
-        map.put(PROCESS_STATUS,BUSINESS_STATUS_3);
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
+
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
+        }
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
         }
 
-        ChildNode childNodeByNodeId = getChildNodeByNodeId(task.getProcessDefinitionId(), task.getTaskDefinitionKey());
+        FlwHisInstance flwHisInstance = flwHisInstanceMapper.selectById(task.getInstanceId());
+
+        ChildNode childNodeByNodeId = getChildNodeByNodeId(flwHisInstance.getProcessId()+"", task.getTaskNodeId());
         Map<String, Object> refuse = childNodeByNodeId.getProps().getRefuse();
         String type = MapUtil.getStr(refuse, "type");
         if(RefuseEnums.TO_END.getTypeName().equals(type)){
-            runtimeService.deleteProcessInstance(task.getProcessInstanceId(),"拒绝");
+            Map<String, Object> variableMap = flwHisInstance.getVariableMap();
+            variableMap.put(PROCESS_STATUS,BUSINESS_STATUS_3);
+            flwHisInstance.setVariable(variableMap);
+            flwHisInstanceMapper.updateById(flwHisInstance);
+            FlowCreator of = FlowCreator.of(task.getAssignorId(), task.getAssignor());
+            runtimeService.terminate(task.getInstanceId(),of);
         }
         else if(RefuseEnums.TO_BEFORE.getTypeName().equals(type)){
-            throw new WorkFlowException("他没写,我也不写,嘿嘿");
+            taskService.rejectTask(task,FlowCreator.of(currentUserInfo.getId(),currentUserInfo.getName()));
+//            throw new WorkFlowException("他没写,我也不写,嘿嘿");
         }
         //TODO 不实现复杂退回模式,他没写我也不写
         else if(RefuseEnums.TO_NODE.getTypeName().equals(type)){
             String target = MapUtil.getStr(refuse, "target");
-            runtimeService.createChangeActivityStateBuilder().moveActivityIdTo(task.getTaskDefinitionKey(),target).changeState();
+            flowLongEngine.executeAndJumpPointIdTask(task.getId(),target,FlowCreator.of(currentUserInfo.getId(),currentUserInfo.getName()));
         }
 
         return Result.OK();
     }
 
+
     @ApiOperation("撤销按钮")
     @PostMapping("/revoke")
     public Result revoke(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        HistoricTaskInstance task = null;
+        FlwTask task=null;
         if(null == taskId){
             //通过流程实例id找最新的taskId
-            List<HistoricTaskInstance> list = historyService.createHistoricTaskInstanceQuery()
-                    .processInstanceId(handleDataDTO.getProcessInstanceId()).orderByTaskId().desc().list();
-            if(CollUtil.isNotEmpty(list)){
-                task = list.get(0);
+            Optional<List<FlwTask>> flwTaskList = queryService.getActiveTasksByInstanceId(Long.valueOf(handleDataDTO.getProcessInstanceId()));
+            if(CollUtil.isNotEmpty(flwTaskList.get())){
+                task = flwTaskList.get().get(0);
             }
         }else {
-            task = historyService.createHistoricTaskInstanceQuery().taskId(taskId).singleResult();
+            task = flwTaskMapper.getCheckById(Long.valueOf(handleDataDTO.getTaskId()));
         }
         if(null == task){
             return Result.error("找不到任务");
@@ -881,35 +1160,67 @@ public class WorkspaceProcessController {
             map.putAll(formValue);
             map.put(FORM_VAR,formData);
         }
-        map.put(PROCESS_STATUS,BUSINESS_STATUS_2);
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
+
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment("option",taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),"sign",handleDataDTO.getSignInfo());
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
         }
-        runtimeService.deleteProcessInstance(task.getProcessInstanceId(),"撤销");
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
+        }
+
+        runtimeService.terminate(task.getInstanceId());
         return Result.OK();
     }
-
 
     @ApiOperation("转办按钮")
     @PostMapping("/assignee")
     public Result assignee(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
+
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
@@ -917,98 +1228,137 @@ public class WorkspaceProcessController {
             map.putAll(formValue);
             map.put(FORM_VAR,formData);
         }
-        map.put(PROCESS_STATUS,BUSINESS_STATUS_1);
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
+
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
         }
-        taskService.setAssignee(taskId,handleDataDTO.getTransferUserInfo().getId());
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
+        }
+        UserInfo transferUserInfo = handleDataDTO.getTransferUserInfo();
+        FlwHisTaskActor flwHisTaskActor = (FlwHisTaskActor) FlwHisTaskActor.ofUser(currentUserInfo.getId(), currentUserInfo.getName());
+        FlwHisTaskActor flwTaskActor = (FlwHisTaskActor) FlwHisTaskActor.ofUser(transferUserInfo.getId(), transferUserInfo.getName());
+        taskService.transferTask(Long.valueOf(taskId),flwHisTaskActor,flwTaskActor);
         return Result.OK();
     }
     @ApiOperation("查询可退回的节点(这个是给 下面 rollback接口作为入参用的 )")
     @PostMapping("/rollbackNodes")
     public Result rollbackNodes(@RequestBody HandleDataDTO handleDataDTO){
-        List<ActivityInstance> list = runtimeService.createActivityInstanceQuery().activityType("userTask").finished().processInstanceId(handleDataDTO.getProcessInstanceId()).list();
+        LambdaQueryWrapper<FlwHisTask> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.isNotNull(FlwHisTask::getFinishTime);
+        lambdaQueryWrapper.eq(FlwHisTask::getInstanceId,Long.valueOf(handleDataDTO.getProcessInstanceId()));
+        List<FlwHisTask> flwHisTasks = flwHisTaskMapper.selectList(lambdaQueryWrapper);
+
         Map<String,String> nodes=new HashMap<>();
-        for (ActivityInstance activityInstance : list) {
-            nodes.put(activityInstance.getActivityId(),activityInstance.getActivityName());
+        for (FlwHisTask activityInstance : flwHisTasks) {
+            nodes.put(activityInstance.getTaskNodeId(),activityInstance.getTaskName());
         }
         return Result.OK(nodes);
     }
 
     @ApiOperation("退回按钮")
-    @PostMapping("/rollback")
+    //todo 由于flowlong并没有指定节点id跳转,所以该接口用不了
+//    @PostMapping("/rollback")
     public Result rollback(@RequestBody HandleDataDTO handleDataDTO){
-        UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
-        List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
-        String comments = handleDataDTO.getComments();
-        JSONObject formData = handleDataDTO.getFormData();
-        String taskId = handleDataDTO.getTaskId();
-        String processInstanceId = handleDataDTO.getProcessInstanceId();
-        List<Task> list = taskService.createTaskQuery().processInstanceId(processInstanceId).list();
-        Task task = null;
-        List<String> taskIds = new ArrayList<>();
-
-        for (Task task1 : list) {
-            if(task1.getId().equals(taskId)){
-                task=task1;
-            }
-            taskIds.add(task1.getTaskDefinitionKey());
-        }
-
-
-
-        Map<String,Object> map=new HashMap<>();
-        if(formData!=null &&formData.size()>0){
-            Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
-            });
-            map.putAll(formValue);
-            map.put(FORM_VAR,formData);
-        }
-        map.put(PROCESS_STATUS,BUSINESS_STATUS_3);
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
-        if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
-        }
-        if(attachments!=null && attachments.size()>0){
-            for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
-            }
-        }
-
-        if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
-        }
-
-
-        runtimeService.createChangeActivityStateBuilder()
-                .processInstanceId(task.getProcessInstanceId())
-                .moveActivityIdsToSingleActivityId(taskIds,handleDataDTO.getRollbackId())
-                .changeState();
+//        UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
+//        List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
+//        String comments = handleDataDTO.getComments();
+//        JSONObject formData = handleDataDTO.getFormData();
+//        String taskId = handleDataDTO.getTaskId();
+//        String processInstanceId = handleDataDTO.getProcessInstanceId();
+//        List<Task> list = taskService.createTaskQuery().processInstanceId(processInstanceId).list();
+//        Task task = null;
+//        List<String> taskIds = new ArrayList<>();
+//
+//        for (Task task1 : list) {
+//            if(task1.getId().equals(taskId)){
+//                task=task1;
+//            }
+//            taskIds.add(task1.getTaskDefinitionKey());
+//        }
+//
+//
+//
+//        Map<String,Object> map=new HashMap<>();
+//        if(formData!=null &&formData.size()>0){
+//            Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
+//            });
+//            map.putAll(formValue);
+//            map.put(FORM_VAR,formData);
+//        }
+//        map.put(PROCESS_STATUS,BUSINESS_STATUS_3);
+//        runtimeService.setVariables(task.getProcessInstanceId(),map);
+//        if(StringUtils.isNotBlank(comments)){
+//            taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
+//        }
+//        if(attachments!=null && attachments.size()>0){
+//            for (AttachmentDTO attachment : attachments) {
+//                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+//            }
+//        }
+//
+//        if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
+//            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+//        }
+//
+//
+//        runtimeService.createChangeActivityStateBuilder()
+//                .processInstanceId(task.getProcessInstanceId())
+//                .moveActivityIdsToSingleActivityId(taskIds,handleDataDTO.getRollbackId())
+//                .changeState();
         return Result.OK();
     }
+
 
 
     @ApiOperation("加签按钮")
     @PostMapping("/addMulti")
     public Result addMulti(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
@@ -1016,24 +1366,58 @@ public class WorkspaceProcessController {
             map.putAll(formValue);
             map.put(FORM_VAR,formData);
         }
-        map.put(PROCESS_STATUS,BUSINESS_STATUS_1);
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
+
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(OPINION_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
         }
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
+        }
+        UserInfo multiAddUserInfo = handleDataDTO.getMultiAddUserInfo();
+        FlwHisTaskActor flwTaskActor = (FlwHisTaskActor) FlwHisTaskActor.ofUser(multiAddUserInfo.getId(), multiAddUserInfo.getName());
 
-        Map<String,Object> variableMap= new HashMap<>();
-        variableMap.put("assigneeName",handleDataDTO.getMultiAddUserInfo().getId());
-        ExecutionEntity execution = (ExecutionEntity) runtimeService.addMultiInstanceExecution(task.getTaskDefinitionKey(), task.getProcessInstanceId(), variableMap);
+        //
+        Integer performType = task.getPerformType();
+        taskService.addTaskActor(task.getId(), PerformType.get(performType),flwTaskActor);
         return Result.OK();
     }
 
@@ -1042,43 +1426,36 @@ public class WorkspaceProcessController {
     @PostMapping("/queryMultiUsersInfo")
     public Result<List<MultiVO>> queryMultiUsersInfo(@RequestBody Map<String,Object> map){
         String taskId = MapUtil.getStr(map, "taskId");
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
-        List<Task> list = taskService.createTaskQuery()
-            .processInstanceId(task.getProcessInstanceId())
-            .taskDefinitionKey(task.getTaskDefinitionKey()).list();
-        Iterator<Task> iterator = list.iterator();
-        List<MultiVO> multiVOList= new ArrayList<>();
-        List<String> assignees=new ArrayList<>();
-        for (Task task1 : list) {
-            assignees.add(task1.getAssignee());
-        }
-        LambdaQueryWrapper<Users> lambdaQueryWrapper= new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.in(Users::getUserId,assignees);
-        List<Users> usersList = userService.list(lambdaQueryWrapper);
-        Map<Long, String> maps = usersList.stream().collect(Collectors.toMap(Users::getUserId, Users::getUserName, (key1, key2) -> key2));
-        while (iterator.hasNext()){
-            Task next = iterator.next();
-            if(!taskId.equals(next.getId())){
-                MultiVO multiVO=new MultiVO();
-                multiVO.setTaskId(next.getId());
-                multiVO.setProcessInstanceId(next.getProcessInstanceId());
-                multiVO.setExecutionId(next.getExecutionId());
-                multiVO.setUserId(next.getAssignee());
-                multiVO.setUserName(maps.get(Long.valueOf(next.getAssignee())));
-                multiVOList.add(multiVO);
-            }
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
+        List<MultiVO> multiVOS = new ArrayList<>();
 
+        List<FlwTaskActor> flwTaskActors = queryService.getTaskActorsByTaskId(task.getId());
+        for (FlwTaskActor flwTaskActor : flwTaskActors) {
+                MultiVO multiVO=new MultiVO();
+                multiVO.setTaskId(flwTaskActor.getTaskId()+"");
+                multiVO.setProcessInstanceId(task.getInstanceId()+"");
+                multiVO.setExecutionId(task.getId()+"---"+flwTaskActor.getActorId());
+                multiVO.setUserId(flwTaskActor.getActorId());
+                multiVO.setUserName(flwTaskActor.getActorName());
+            multiVOS.add(multiVO);
         }
-        return Result.OK(multiVOList);
+
+
+        return Result.OK(multiVOS);
     }
 
     @ApiOperation("减签按钮")
     @PostMapping("/deleteMulti")
     public Result deleteMulti(@RequestBody Map<String,Object> map){
         List<String> executionIds = MapUtil.get(map, "executionIds", List.class);
+        String  taskId="";
+        List<String> actorIds=new ArrayList<>();
         for (String executionId : executionIds) {
-            runtimeService.deleteMultiInstanceExecution(executionId,true);
+            String[] split = executionId.split("---");
+            taskId=split[0];
+            actorIds.add(split[1]);
         }
+        taskService.removeTaskActor(Long.valueOf(taskId),actorIds);
         return Result.OK();
     }
 
@@ -1087,12 +1464,11 @@ public class WorkspaceProcessController {
     @PostMapping("/comments")
     public Result comments(@RequestBody HandleDataDTO handleDataDTO){
         UserInfo currentUserInfo = handleDataDTO.getCurrentUserInfo();
-        Authentication.setAuthenticatedUserId(currentUserInfo.getId());
         List<AttachmentDTO> attachments = handleDataDTO.getAttachments();
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        FlwTask task = flwTaskMapper.getCheckById(Long.valueOf(taskId));
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
@@ -1100,22 +1476,247 @@ public class WorkspaceProcessController {
             map.putAll(formValue);
             map.put(FORM_VAR,formData);
         }
-//        map.put(PROCESS_STATUS,BUSINESS_STATUS_1);
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
+
+        runtimeService.addVariable(task.getInstanceId(),map);
+        List<ProcessComments> commentsList =new ArrayList<>();
+        List<ProcessAttachments> attachmentsList = new ArrayList<>();
         if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),COMMENTS_COMMENT,comments);
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(COMMENTS_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(comments);
+            commentsList.add(processComments);
+
         }
         if(attachments!=null && attachments.size()>0){
             for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                ProcessAttachments processAttachments =new ProcessAttachments();
+                processAttachments.setUserId(currentUserInfo.getId());
+                processAttachments.setFileName(attachment.getName());
+                processAttachments.setFileDesc(attachment.getName());
+                processAttachments.setTypes(OPTION_COMMENT);
+                processAttachments.setCreateTime(new Date());
+                processAttachments.setTaskId(task.getId());
+                processAttachments.setInstanceId(task.getInstanceId());
+                processAttachments.setUrl(attachment.getUrl());
+                attachmentsList.add(processAttachments);
             }
         }
 
         if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            ProcessComments processComments =new ProcessComments();
+            processComments.setTypes(SIGN_COMMENT);
+            processComments.setCreateTime(new Date());
+            processComments.setUserId(currentUserInfo.getId());
+            processComments.setTaskId(task.getId());
+            processComments.setInstanceId(task.getInstanceId());
+            processComments.setMessage(handleDataDTO.getSignInfo());
+            commentsList.add(processComments);
+        }
+        if(CollUtil.isNotEmpty(attachmentsList)){
+            processAttachmentsService.saveBatch(attachmentsList);
+        }
+        if(CollUtil.isNotEmpty(commentsList)){
+            processCommentsService.saveBatch(commentsList);
         }
         return Result.OK();
     }
+
+
+    @ApiOperation("通过流程实例查看审批记录")
+    @PostMapping("process/record/{processInstanceId}")
+    public Result<List<TaskDetailVO>> record(@PathVariable("processInstanceId") String processInstanceId){
+        LambdaQueryWrapper<ProcessComments> lambdaQueryWrapper  =new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(ProcessComments::getInstanceId,processInstanceId);
+        List<ProcessComments> processCommentsList = processCommentsService.list(lambdaQueryWrapper);
+
+
+        Map<Long, List<ProcessComments>> commentsMap = processCommentsList.stream()
+                .collect(Collectors.groupingBy(ProcessComments::getTaskId));
+
+
+        LambdaQueryWrapper<ProcessAttachments> processAttachmentsLambdaQueryWrapper  =new LambdaQueryWrapper<>();
+        processAttachmentsLambdaQueryWrapper.eq(ProcessAttachments::getInstanceId,processInstanceId);
+        List<ProcessAttachments> processAttachments = processAttachmentsService.list(processAttachmentsLambdaQueryWrapper);
+
+
+        Map<Long, List<ProcessAttachments>> attachmentMap = processAttachments.stream()
+                .collect(Collectors.groupingBy(ProcessAttachments::getTaskId));
+
+        LambdaQueryWrapper<FlwHisTask> flwHisTaskLambdaQueryWrapper= new LambdaQueryWrapper<>();
+        flwHisTaskLambdaQueryWrapper.eq(FlwHisTask::getInstanceId,processInstanceId);
+        List<FlwHisTask> list = flwHisTaskMapper.selectList(flwHisTaskLambdaQueryWrapper);
+
+        List<TaskDetailVO> taskDetailVOS= new ArrayList<>();
+        for (FlwHisTask historicActivityInstance : list) {
+            if("root".equals(historicActivityInstance.getTaskNodeId())){
+                TaskDetailVO taskDetailVO= new TaskDetailVO();
+                taskDetailVO.setTaskId(historicActivityInstance.getId()+"");
+                taskDetailVO.setActivityId(historicActivityInstance.getTaskNodeId());
+                taskDetailVO.setName("流程开始");
+                taskDetailVO.setCreateTime(historicActivityInstance.getCreateTime());
+                taskDetailVO.setEndTime(historicActivityInstance.getFinishTime());
+                taskDetailVOS.add(taskDetailVO);
+
+//                taskDetailVO.setSignImage();
+//                taskDetailVO.setAttachmentVOList();
+//                taskDetailVO.setOptionVOList();
+//                taskDetailVO.setCommentVOList();
+            }
+//            else if("endEvent".equals(historicActivityInstance.getActivityType())){
+//                TaskDetailVO taskDetailVO= new TaskDetailVO();
+//                taskDetailVO.setTaskId(historicActivityInstance.getTaskId());
+//                taskDetailVO.setActivityId(historicActivityInstance.getActivityId());
+//                taskDetailVO.setName("流程结束");
+//                taskDetailVO.setCreateTime(historicActivityInstance.getStartTime());
+//                taskDetailVO.setEndTime(historicActivityInstance.getEndTime());
+//                taskDetailVOS.add(taskDetailVO);
+//            }
+            else {
+                List<ProcessComments> comments = commentsMap.get(historicActivityInstance.getId());
+                if(CollUtil.isNotEmpty(comments)){
+                    for (ProcessComments comment : comments) {
+                        if(OPINION_COMMENT.equals(comment.getTypes())){
+                            TaskDetailVO taskDetailVO= new TaskDetailVO();
+                            taskDetailVO.setTaskId(historicActivityInstance.getId()+"");
+                            taskDetailVO.setActivityId(historicActivityInstance.getTaskNodeId());
+                            taskDetailVO.setName(historicActivityInstance.getTaskName());
+                            taskDetailVO.setCreateTime(historicActivityInstance.getCreateTime());
+                            taskDetailVO.setEndTime(historicActivityInstance.getFinishTime());
+                            taskDetailVO.setComment(comment.getMessage());
+                            List<ProcessAttachments> attachments = attachmentMap.get(historicActivityInstance.getId());
+                            List<AttachmentVO> attachmentVOList = new ArrayList<>();
+                            for (ProcessAttachments attachment : attachments) {
+                                AttachmentVO attachmentVO = new AttachmentVO();
+                                attachmentVO.setId(attachment.getId());
+                                attachmentVO.setName(attachment.getFileName());
+                                attachmentVO.setUrl(attachment.getUrl());
+                                attachmentVOList.add(attachmentVO);
+                            }
+
+                            for (ProcessComments comment1 : comments) {
+                                if(SIGN_COMMENT.equals(comment1.getTypes())){
+                                    taskDetailVO.setSignImage(comment1.getMessage());
+                                }
+                            }
+
+                            taskDetailVO.setAttachmentVOList(attachmentVOList);
+                            taskDetailVOS.add(taskDetailVO);
+                        }
+                    }
+                }
+            }
+        }
+        return Result.OK(taskDetailVOS);
+    }
+
+
+    @ApiOperation("查看抄送")
+    @PostMapping("process/ccList")
+    public Result<Page<TaskVO>> ccList(@RequestBody TaskDTO taskDTO){
+        LambdaQueryWrapper<FlwTaskCc> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(FlwTaskCc::getActorId,taskDTO.getCurrentUserInfo().getId());
+        Page page= new Page();
+        page.setCurrent(taskDTO.getPageNo());
+        page.setSize(taskDTO.getPageSize());
+        List<FlwTaskCc> ccList = flwTaskCcMapper.selectList(lambdaQueryWrapper);
+        page.setTotal(ccList.size());
+        if(CollUtil.isNotEmpty(ccList)){
+            Set<String> processInstanceIds= new HashSet<>();
+            for (FlwTaskCc cc : ccList) {
+                processInstanceIds.add(cc.getInstanceId()+"");
+            }
+            List<FlwHisInstance> processInstanceList = flwHisInstanceMapper.selectBatchIds(processInstanceIds);
+            Map<String,FlwHisInstance> map =new HashMap<>();
+            for (FlwHisInstance historicProcessInstance : processInstanceList) {
+                map.put(historicProcessInstance.getId()+"",historicProcessInstance);
+            }
+
+            List<String> applyUserIds= new ArrayList<>();
+            for (FlwHisInstance historicProcessInstance : processInstanceList) {
+                Map<String, Object> processVariables = historicProcessInstance.getVariableMap();
+                String id = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
+                }).getId();
+                applyUserIds.add(id);
+            }
+            Map<Long, Users> collect=new HashMap<>();
+            if(CollUtil.isNotEmpty(applyUserIds)){
+                LambdaQueryWrapper<Users> userLambdaQueryWrapper = new LambdaQueryWrapper<>();
+                userLambdaQueryWrapper.in(Users::getUserId,applyUserIds);
+                List<Users> list = userService.list(userLambdaQueryWrapper);
+                collect = list.stream().collect(Collectors.toMap(Users::getUserId, Function.identity()));
+            }
+
+
+            List<CCVO> ccvos=new ArrayList<>();
+            for (FlwTaskCc cc : ccList) {
+                CCVO ccvo = new CCVO();
+                FlwHisInstance historicProcessInstance = map.get(cc.getInstanceId());
+                Map<String, Object> processVariables = historicProcessInstance.getVariableMap();
+                ccvo.setProcessInstanceId(historicProcessInstance.getId()+"");
+                String name = processService.getProcessById(historicProcessInstance.getProcessId()).getProcessModel().getName();
+                ccvo.setProcessDefinitionName(name);
+                ccvo.setStartUser(JSONObject.parseObject(MapUtil.getStr(processVariables,START_USER_INFO),new TypeReference<UserInfo>(){}));
+                ccvo.setUsers(collect.get(Long.valueOf(ccvo.getStartUser().getId())));
+                ccvo.setStartTime(historicProcessInstance.getCreateTime());
+                ccvo.setEndTime(historicProcessInstance.getEndTime());
+                Boolean flag= historicProcessInstance.getEndTime() != null;
+                ccvo.setCurrentActivityName(getCurrentName(historicProcessInstance.getId()+"",flag));
+                ccvo.setBusinessStatus(MapUtil.getStr(processVariables,PROCESS_STATUS));
+
+
+                long totalTimes = historicProcessInstance.getEndTime()==null?
+                        (Calendar.getInstance().getTimeInMillis()-historicProcessInstance.getCreateTime().getTime()):
+                        (historicProcessInstance.getEndTime().getTime()-historicProcessInstance.getCreateTime().getTime());
+                long dayCount = totalTimes /(1000*60*60*24);//计算天
+                long restTimes = totalTimes %(1000*60*60*24);//剩下的时间用于计于小时
+                long hourCount = restTimes/(1000*60*60);//小时
+                restTimes = restTimes % (1000*60*60);
+                long minuteCount = restTimes / (1000*60);
+
+                String spendTimes = dayCount+"天"+hourCount+"小时"+minuteCount+"分";
+                ccvo.setDuration(spendTimes);
+                ccvos.add(ccvo);
+            }
+            page.setRecords(ccvos);
+
+        }
+        return Result.OK(page);
+    }
+
+  /*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     @ApiOperation("通过流程实例查看审批记录")
     @PostMapping("process/record/{processInstanceId}")

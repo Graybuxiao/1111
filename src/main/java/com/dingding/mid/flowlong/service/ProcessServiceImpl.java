@@ -14,7 +14,12 @@
  */
 package com.dingding.mid.flowlong.service;
 
+import cn.hutool.core.map.MapUtil;
+import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.TypeReference;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.dingding.mid.dto.DeployDTO;
+import com.dingding.mid.entity.ProcessTemplates;
 import com.dingding.mid.flowlong.ProcessService;
 import com.dingding.mid.flowlong.RuntimeService;
 import com.dingding.mid.flowlong.assist.Assert;
@@ -29,6 +34,7 @@ import com.dingding.mid.flowlong.model.ProcessModel;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+
 
 /**
  * 流程定义业务类
@@ -99,7 +105,11 @@ public class ProcessServiceImpl implements ProcessService {
     public Long deploy(String jsonString, FlowCreator flowCreator, boolean repeat) {
         Assert.isNull(jsonString);
         try {
-             ProcessModel processModel = ProcessModel.parse(jsonString, null);
+            DeployDTO deployDTO = JSONObject.parseObject(jsonString, new TypeReference<DeployDTO>() {
+            });
+            String processJson = deployDTO.getProcessJson();
+
+            ProcessModel processModel = ProcessModel.parse(jsonString, null);
             /**
              * 查询流程信息获取最后版本号
              */
@@ -119,10 +129,12 @@ public class ProcessServiceImpl implements ProcessService {
              * 当前版本 +1 添加一条新的流程记录
              */
             FlwProcess process = new FlwProcess();
+            ProcessTemplates processTemplates = deployDTO.getProcessTemplates();
+            process.setProcessIcon(processTemplates.getIcon());
             process.setProcessVersion(version + 1);
             process.setFlowState(FlowState.active);
-            process.setProcessName(processModel.getName());
-            process.setDisplayName(processModel.getName());
+            process.setProcessName(processTemplates.getTemplateName());
+            process.setDisplayName(processTemplates.getTemplateName());
             process.setInstanceUrl(processModel.getInstanceUrl());
             process.setUseScope(0);
             process.setModelContent(jsonString);

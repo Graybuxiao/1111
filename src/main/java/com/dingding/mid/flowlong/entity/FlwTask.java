@@ -50,6 +50,7 @@ public class FlwTask extends FlowEntity {
      * 父任务ID
      */
     protected Long parentTaskId;
+    protected String taskNodeId;
     /**
      * 任务名称
      */
@@ -151,6 +152,7 @@ public class FlwTask extends FlowEntity {
         newFlwTask.setTenantId(tenantId);
         newFlwTask.setInstanceId(instanceId);
         newFlwTask.setParentTaskId(parentTaskId);
+        newFlwTask.setTaskNodeId(taskNodeId);
         newFlwTask.setTaskName(taskName);
         newFlwTask.setDisplayName(displayName);
         newFlwTask.setTaskType(taskType);

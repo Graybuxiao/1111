@@ -5,10 +5,12 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.dingding.mid.common.R;
 import com.dingding.mid.common.WorkFlowConstants;
+import com.dingding.mid.dto.DeployDTO;
 import com.dingding.mid.dto.FlowEngineDTO;
 import com.dingding.mid.dto.json.ChildNode;
 import com.dingding.mid.dto.json.FormItem;
@@ -42,6 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import javax.annotation.Resource;
+
+import static com.dingding.mid.common.WorkFlowConstants.*;
 
 
 /**
@@ -289,11 +293,15 @@ public class SettingServiceImpl implements SettingService {
         processTemplates.setUpdated(new Date());
 
         ChildNode childNode = JSONObject.parseObject(template.getProcess(), new TypeReference<ChildNode>(){});
-        JSONObject jsonObject=new JSONObject();
-        jsonObject.put("processJson",template.getProcess());
-        jsonObject.put("formJson",template.getFormItems());
+        DeployDTO deployDTO = new DeployDTO();
+        deployDTO.setProcessJson(template.getProcess());
+        deployDTO.setFormJson(template.getFormItems());
+        deployDTO.setProcessTemplates(processTemplates);
+
+
         FlowCreator admin = FlowCreator.ADMIN;
-        Long deploy = processService.deploy(template.getProcess(), admin, true);
+        String jsonStr = JSONObject.toJSONString(deployDTO,SerializerFeature.WriteMapNullValue);
+        Long deploy = processService.deploy(jsonStr, admin, true);
         processTemplates.setFlowLongId(deploy);
         processTemplateService.updateById(processTemplates);
         System.err.println(deploy);
@@ -347,12 +355,15 @@ public class SettingServiceImpl implements SettingService {
         templateGroup.setCreated(date);
         templateGroupService.save(templateGroup);
 
-        JSONObject jsonObject=new JSONObject();
-        jsonObject.put("processJson", processJson);
-        jsonObject.put("formJson", formItems);
+
+        DeployDTO deployDTO = new DeployDTO();
+        deployDTO.setProcessJson(processJson);
+        deployDTO.setFormJson(formItems);
+        deployDTO.setProcessTemplates(processTemplates);
 
         FlowCreator admin = FlowCreator.ADMIN;
-        Long deploy = processService.deploy(processJson, admin, true);
+        String json = JSONObject.toJSONString(deployDTO, SerializerFeature.WriteMapNullValue);
+        Long deploy = processService.deploy(json, admin, true);
         System.err.println(deploy);
         processTemplates.setFlowLongId(deploy);
         processTemplateService.save(processTemplates);

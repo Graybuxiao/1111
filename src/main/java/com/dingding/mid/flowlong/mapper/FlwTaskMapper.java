@@ -18,6 +18,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dingding.mid.flowlong.assist.Assert;
 import com.dingding.mid.flowlong.entity.FlwTask;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -32,6 +33,7 @@ import java.util.List;
  * @since 1.0
  */
 public interface FlwTaskMapper extends BaseMapper<FlwTask> {
+    List<FlwTask> todoTask(@Param("userId") String userId);
 
     /**
      * 获取任务并检查ID的合法性

@@ -141,6 +141,9 @@ public class RuntimeServiceImpl implements RuntimeService {
         flwHisInstance.setId(instanceId);
         flwHisInstance.setInstanceState(InstanceState.complete);
         flwHisInstance.setEndTime(DateUtils.getCurrentDate());
+        //主动读取ru instance  从而赋值到最新的
+        FlwInstance flwInstance = instanceMapper.selectById(instanceId);
+        flwHisInstance.setVariable(flwInstance.getVariableMap());
         instanceMapper.deleteById(instanceId);
         hisInstanceMapper.updateById(flwHisInstance);
         // 流程实例监听器通知

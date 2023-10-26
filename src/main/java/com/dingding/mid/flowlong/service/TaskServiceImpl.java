@@ -106,6 +106,7 @@ public class TaskServiceImpl implements TaskService {
         // 迁移 task 信息到 flw_his_task
         FlwHisTask hisTask = FlwHisTask.of(flwTask);
         hisTask.setFinishTime(DateUtils.getCurrentDate());
+        hisTask.setTaskNodeId(flwTask.getTaskNodeId());
         hisTask.setTaskState(taskState);
         hisTask.setCreateId(flowCreator.getCreateId());
         hisTask.setCreateBy(flowCreator.getCreateBy());
@@ -503,6 +504,7 @@ public class TaskServiceImpl implements TaskService {
         flwTask.setCreateBy(execution.getCreateBy());
         flwTask.setCreateTime(DateUtils.getCurrentDate());
         flwTask.setInstanceId(execution.getFlwInstance().getId());
+        flwTask.setTaskNodeId(nodeModel.getNodeId());
         flwTask.setTaskName(nodeModel.getNodeName());
         flwTask.setDisplayName(nodeModel.getNodeName());
         flwTask.setTaskType(nodeModel.getType());
@@ -533,6 +535,7 @@ public class TaskServiceImpl implements TaskService {
 
         Assert.isTrue(ObjectUtils.isEmpty(taskActors), "任务参与者不能为空");
         flwTask.setPerformType(performType);
+        //todo 设计有问题 应该是10条数据,而只产生了一条数据
         if (performType == PerformType.orSign) {
             /**
              * 或签一条任务多个参与者
@@ -544,21 +547,38 @@ public class TaskServiceImpl implements TaskService {
             // 创建任务监听
             this.taskNotify(EventType.create, flwTask);
             return flwTasks;
+/*            taskActors.forEach(t -> {
+                FlwTask newFlwTask = flwTask.cloneTask(null);
+                newFlwTask.setAssignorId(t.getActorId());
+                newFlwTask.setAssignor(t.getActorName());
+                taskMapper.insert(newFlwTask);
+                flwTasks.add(newFlwTask);
+
+                // 分配参与者
+                this.assignTask(newFlwTask.getInstanceId(), newFlwTask.getId(), t);
+
+                // 创建任务监听
+                this.taskNotify(EventType.create, newFlwTask);
+            });*/
         }
 
         if (performType == PerformType.sort) {
-            /**
-             * 按顺序依次审批，一个任务按顺序多个参与者依次添加
-             */
-            taskMapper.insert(flwTask);
-            flwTasks.add(flwTask);
-
             // 分配一个参与者
             FlwTaskActor nextFlwTaskActor = null;
             if (null != execution) {
                 nextFlwTaskActor = execution.getNextFlwTaskActor();
             }
-            this.assignTask(flwTask.getInstanceId(), flwTask.getId(), null == nextFlwTaskActor ? taskActors.get(0) : nextFlwTaskActor);
+
+            FlwTaskActor flwTaskActor = null == nextFlwTaskActor ? taskActors.get(0) : nextFlwTaskActor;
+            //            flwTask.setAssignorId(taskActors);
+            /**
+             * 按顺序依次审批，一个任务按顺序多个参与者依次添加
+             */
+            flwTask.setAssignorId(flwTaskActor.getActorId());
+            flwTask.setTaskName(flwTaskActor.getActorName());
+            taskMapper.insert(flwTask);
+            flwTasks.add(flwTask);
+            this.assignTask(flwTask.getInstanceId(), flwTask.getId(), flwTaskActor);
 
             // 创建任务监听
             this.taskNotify(EventType.create, flwTask);
@@ -570,6 +590,8 @@ public class TaskServiceImpl implements TaskService {
          */
         taskActors.forEach(t -> {
             FlwTask newFlwTask = flwTask.cloneTask(null);
+            newFlwTask.setAssignorId(t.getActorId());
+            newFlwTask.setAssignor(t.getActorName());
             taskMapper.insert(newFlwTask);
             flwTasks.add(newFlwTask);
 

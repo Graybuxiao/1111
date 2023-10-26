@@ -137,8 +137,13 @@ public interface FlowLongEngine {
      * @return List<Task> 任务集合
      */
     void executeAndJumpTask(Long taskId, String nodeName, FlowCreator flowCreator, Map<String, Object> args);
+    void executeAndJumpNodeTask(Long taskId, String nodeName, FlowCreator flowCreator, Map<String, Object> args);
 
     default void executeAndJumpTask(Long taskId, String nodeName, FlowCreator flowCreator) {
         this.executeAndJumpTask(taskId, nodeName, flowCreator, null);
+    }
+
+    default void executeAndJumpPointIdTask(Long taskId, String id, FlowCreator flowCreator) {
+        this.executeAndJumpNodeTask(taskId, id, flowCreator, null);
     }
 }

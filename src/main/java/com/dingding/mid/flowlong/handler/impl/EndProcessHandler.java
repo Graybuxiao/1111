@@ -25,6 +25,10 @@ import com.dingding.mid.flowlong.entity.FlwTask;
 import com.dingding.mid.flowlong.handler.FlowLongHandler;
 
 import java.util.List;
+import java.util.Map;
+
+import static com.dingding.mid.common.CommonConstants.BUSINESS_STATUS_4;
+import static com.dingding.mid.common.CommonConstants.PROCESS_STATUS;
 
 /**
  * 结束流程实例的处理器
@@ -53,6 +57,10 @@ public class EndProcessHandler implements FlowLongHandler {
         /**
          * 结束当前流程实例
          */
+
+        Map<String, Object> variableMap = flwInstance.getVariableMap();
+        variableMap.put(PROCESS_STATUS,BUSINESS_STATUS_4);
+        engine.getContext().getRuntimeService().addVariable(flwInstance.getId(),variableMap);
         engine.runtimeService().complete(flwInstance.getId());
     }
 }

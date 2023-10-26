@@ -5,6 +5,7 @@
  */
 package com.dingding.mid.flowlong.model;
 
+import com.dingding.mid.dto.json.GroupsInfo;
 import com.dingding.mid.flowlong.assist.ObjectUtils;
 import lombok.Getter;
 import lombok.Setter;
@@ -43,6 +44,11 @@ public class ConditionNode extends BaseEx {
      * 节点条件表达式列表
      */
     private List<NodeExpression> conditionList;
+//    private List<GroupsInfo> groups;
+//    private String groupsType;
+    private String methodStr;
+
+
     /**
      * 子节点
      */

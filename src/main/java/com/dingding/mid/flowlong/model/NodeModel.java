@@ -5,6 +5,7 @@
  */
 package com.dingding.mid.flowlong.model;
 
+import com.dingding.mid.dto.json.ChildNode;
 import com.dingding.mid.flowlong.Expression;
 import com.dingding.mid.flowlong.ModelInstance;
 import com.dingding.mid.flowlong.assist.Assert;
@@ -28,6 +29,8 @@ import java.util.*;
 @Getter
 @Setter
 public class NodeModel extends BaseEx implements ModelInstance {
+    //todo 暂时把childNode存进去,因为不想去修改前端渲染方式
+    private ChildNode wChildNode;
     /**
      * 节点名称
      */
@@ -92,7 +95,7 @@ public class NodeModel extends BaseEx implements ModelInstance {
      */
     private Integer termMode;
     /**
-     * 多人审批时审批方式 {@link com.flowlong.bpm.engine.core.enums}
+     * 多人审批时审批方式 {@link }
      * <p>
      * 1，按顺序依次审批
      * 2，会签 (可同时审批，每个人必须审批通过)
@@ -137,12 +140,13 @@ public class NodeModel extends BaseEx implements ModelInstance {
             Assert.isNull(expression, "Interface Expression not implemented");
             Optional<ConditionNode> conditionNodeOptional = this.getConditionNodes().stream().sorted(Comparator.comparing(ConditionNode::getPriorityLevel))
                     .filter(t -> {
-                        // 执行条件分支
-                        final String expr = t.getExpr();
+
+
+                        final String methodStr = t.getMethodStr();
                         boolean result = true;
-                        if (null != expr) {
+                        if (null != methodStr) {
                             try {
-                                result = expression.eval(Boolean.class, expr, args);
+                                result = expression.eval(Boolean.class, methodStr, args);
                             } catch (Throwable e) {
                                 result = false;
                                 e.printStackTrace();
@@ -215,10 +219,41 @@ public class NodeModel extends BaseEx implements ModelInstance {
         return null;
     }
 
+    private NodeModel getFromConditionNodesById(String nodeName) {
+        for (ConditionNode conditionNode : getConditionNodes()) {
+            NodeModel conditionChildNode = conditionNode.getChildNode();
+            if (null != conditionChildNode) {
+                NodeModel nodeModel = conditionChildNode.getNodeById(nodeName);
+                if (null != nodeModel) {
+                    return nodeModel;
+                }
+            }
+        }
+        return null;
+    }
+
+
     /**
      * 判断是否为条件节点
      */
     public boolean isConditionNode() {
         return 3 == type || 4 == type;
+    }
+
+    public NodeModel getNodeById(String nodeName) {
+        if (Objects.equals(this.getNodeId(), nodeName)) {
+            return this;
+        }
+        if (null != this.getConditionNodes()) {
+            NodeModel fromConditionNode = getFromConditionNodesById(nodeName);
+            if (fromConditionNode != null) {
+                return fromConditionNode;
+            }
+        }
+        // 条件节点中没有找到 那么去它的同级子节点中继续查找
+        if (null != this.getChildNode()) {
+            return this.getChildNode().getNodeById(nodeName);
+        }
+        return null;
     }
 }

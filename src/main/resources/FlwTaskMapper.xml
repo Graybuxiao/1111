@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dingding.mid.flowlong.mapper.FlwTaskMapper">
+
+    <select id="todoTask" resultType="com.dingding.mid.flowlong.entity.FlwTask">
+        SELECT * FROM flw_task f
+        where f.assignor_id is null
+        and exists(select LINK.ID_ from flw_task_actor f1 where  f1.task_id = f.id and f1.actor_id=#{userId}
+    </select>
+
+</mapper>
