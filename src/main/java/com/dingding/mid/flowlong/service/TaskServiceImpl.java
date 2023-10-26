@@ -14,6 +14,7 @@
  */
 package com.dingding.mid.flowlong.service;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.map.MapUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
@@ -231,8 +232,8 @@ public class TaskServiceImpl implements TaskService {
         FlwTask flwTask = new FlwTask();
         flwTask.setId(taskId);
         flwTask.setTaskType(taskType);
-        flwTask.setAssignorId(taskActor.getActorId());
-        flwTask.setAssignor(taskActor.getActorName());
+        flwTask.setAssignorId(assigneeTaskActor.getActorId());
+        flwTask.setAssignor(assigneeTaskActor.getActorName());
         taskMapper.updateById(flwTask);
 
         // 删除任务历史参与者
@@ -522,6 +523,11 @@ public class TaskServiceImpl implements TaskService {
     protected List<FlwTask> saveTask(FlwTask flwTask, PerformType performType, List<FlwTaskActor> taskActors, Execution execution) {
         List<FlwTask> flwTasks = new ArrayList<>();
         if (performType == PerformType.unknown) {
+            if(taskActors.size()==1){
+                FlwTaskActor flwTaskActor = taskActors.get(0);
+                flwTask.setAssignorId(flwTaskActor.getActorId());
+                flwTask.setAssignor(flwTaskActor.getActorName());
+            }
             // 发起、其它
             flwTask.setVariable(execution.getArgs());
             taskMapper.insert(flwTask);

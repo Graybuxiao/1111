@@ -26,7 +26,7 @@ public class ExUtils {
             String s = list.get(0);
             return s.equals(controlId);
     }
-    public Boolean strEqualsMethod(String controlId,String...values){
+    public static Boolean strEqualsMethod(String controlId,String...values){
         List<String> list = Arrays.asList(values);
         if(list.size()>1){
             return Boolean.FALSE;
@@ -37,37 +37,33 @@ public class ExUtils {
         }
     }
 
-    public Boolean strContains(String controlId,String...values){
+    public static Boolean strContains(String controlId,String...values){
         List<String> list = Arrays.asList(values);
         return list.contains(controlId);
     }
 
-    public Boolean strContains(String controlId,Number...values){
+    public static Boolean strContains(String controlId,Number...values){
         Long aLong = Long.valueOf(controlId);
         List<Number> numbers = Arrays.asList(values);
         return numbers.contains(aLong);
     }
 
-    public Boolean strContainsMethod(String controlId,String...values){
+    public static Boolean strContainsMethod(String controlId,String...values){
         List<String> strings = Arrays.asList(values);
         return strings.contains(controlId);
     }
 
 
- /*   public Boolean userStrContainsMethod(String controlId, String fromText, DelegateExecution execution){
-        Object executionVariable = execution.getVariable(controlId);
-        if(executionVariable instanceof String){
-            String variable = (String) execution.getVariable(controlId);
-            if(StringUtils.isBlank(variable)){
-                return Boolean.FALSE;
-            }
-            List<UserInfo> userInfos = JSONObject.parseObject(variable, new TypeReference<List<UserInfo>>() {
+    public static Boolean userStrContainsMethod(String controlId, Object fromText){
+        if(fromText instanceof Integer){
+            List<UserInfo> userInfos = JSONObject.parseObject(controlId, new TypeReference<List<UserInfo>>() {
             });
             List<String> idsList= new ArrayList<>();
             for (UserInfo userInfo : userInfos) {
                 idsList.add(userInfo.getId());
             }
-            String[] split = fromText.split(",");
+            String str=fromText+"";
+            String[] split = str.split(",");
             List<String> strings = Arrays.asList(split);
             Collection<String> intersection = CollUtil.intersection(strings, idsList);
             if(CollUtil.isEmpty(intersection)){
@@ -77,14 +73,14 @@ public class ExUtils {
 
         }
         else{
-            JSONArray variable = (JSONArray) execution.getVariable(controlId);
-            List<UserInfo> userInfos = JSONObject.parseObject(variable.toJSONString(), new TypeReference<List<UserInfo>>() {
+            List<UserInfo> userInfos = JSONObject.parseObject(controlId, new TypeReference<List<UserInfo>>() {
             });
             List<String> idsList= new ArrayList<>();
             for (UserInfo userInfo : userInfos) {
                 idsList.add(userInfo.getId());
             }
-            String[] split = fromText.split(",");
+            String str=fromText+"";
+            String[] split = str.split(",");
             List<String> strings = Arrays.asList(split);
             Collection<String> intersection = CollUtil.intersection(strings, idsList);
             if(CollUtil.isEmpty(intersection)){
@@ -94,21 +90,7 @@ public class ExUtils {
         }
 
     }
-*/
-    public Boolean userStrContainsMethod(String controlId,String...values){
-        List<String> strings = Arrays.asList(values);
-        List<UserInfo> userInfos = JSONObject.parseObject(controlId, new TypeReference<List<UserInfo>>() {
-        });
-        List<String> idsList= new ArrayList<>();
-        for (UserInfo userInfo : userInfos) {
-            idsList.add(userInfo.getId());
-        }
-        Collection<String> intersection = CollUtil.intersection(strings, idsList);
-        if(CollUtil.isEmpty(intersection)){
-            return Boolean.FALSE;
-        }
-        return Boolean.TRUE;
-    }
+
 
  /*   public Boolean deptStrContainsMethod(String controlId,String fromText,DelegateExecution execution){
         Object executionVariable = execution.getVariable(controlId);

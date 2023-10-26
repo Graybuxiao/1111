@@ -54,16 +54,16 @@ public class DingDingAdminApplication extends SpringBootServletInitializer imple
         List<FlowLongInterceptor> interceptors = flowLongEngineContext.getInterceptors();
         TaskAccessStrategy taskAccessStrategy = flowLongEngineContext.getTaskAccessStrategy();
         System.err.println("----验证源码集成FlowLong成功------------------");
-//        ExpressionParser parser = new SpelExpressionParser();
-//        EvaluationContext context = new StandardEvaluationContext();
-////        for (Map.Entry<String, Object> entry : args.entr) {
-////            context.setVariable(entry.getKey(), entry.getValue());
-////        }
-//        context.setVariable("name","张三");
-//
-//        String expr="T(com.dingding.mid.utils.ExUtils).strEqualsMethod(#name,'张三')";
-//        Boolean value = parser.parseExpression(expr).getValue(context, Boolean.class);
-//        System.err.println(value);
+        ExpressionParser parser = new SpelExpressionParser();
+        EvaluationContext context = new StandardEvaluationContext();
+//        for (Map.Entry<String, Object> entry : args.entr) {
+//            context.setVariable(entry.getKey(), entry.getValue());
+//        }
+        context.setVariable("rootEx","张三");
+
+        String expr="T(com.dingding.mid.utils.ExUtils).strEqualsMethod(#rootEx,'张三')";
+        Boolean value = parser.parseExpression(expr).getValue(context, Boolean.class);
+        System.err.println(value);
     }
 
 

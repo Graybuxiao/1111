@@ -247,7 +247,11 @@ public class ProcessModel {
                 iteratorChildNode(branch.getChildren(),processModel,conditionModel);
 
             }
-            viewNodeModel.setConditionNodes(conditionNodes);
+            nodeModel.setConditionNodes(conditionNodes);
+            ChildNode children = childNode.getChildren();
+            if(children!=null&&(!"EMPTY".equals(children.getType()))){
+                iteratorChildNode(childNode.getChildren(),processModel,nodeModel);
+            }
         }
     }
 
@@ -325,9 +329,8 @@ public class ProcessModel {
                         JSONObject obj=(JSONObject)o;
                         userIds.add(obj.getString("id"));
                     }
-                    String str=" "+ EXPRESSION_CLASS+"userStrContainsMethod(\"{0}\",\"{1}\",    execution) ";
-                    str = str.replace("{0}", id);
-                    str = str.replace("{1}", StringUtils.join(userIds, ","));
+                    String str=" "+ EXPRESSION_CLASS+"userStrContainsMethod(#"+id+",\"{0}\") ";
+                    str = str.replace("{0}", StringUtils.join(userIds, ","));
                     conditionExpression.append(str );
                 }
                 else if("Dept".equals(valueType)){
@@ -336,8 +339,8 @@ public class ProcessModel {
                         JSONObject obj=(JSONObject)o;
                         userIds.add(obj.getString("id"));
                     }
-                    String str=" "+ EXPRESSION_CLASS+"deptStrContainsMethod(\"{0}\",\"{1}\",    execution) ";
-                    str = str.replace("{0}", id);
+                    String str=" "+ EXPRESSION_CLASS+"deptStrContainsMethod(\"{0}\",\"{1}\") ";
+                    str = str.replace("{0}", "#"+id);
                     str = str.replace("{1}", StringUtils.join(userIds, ","));
                     conditionExpression.append(str );
                 }

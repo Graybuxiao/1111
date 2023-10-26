@@ -153,7 +153,7 @@ public class FlowLongEngineImpl implements FlowLongEngine {
             Assert.isNull(processModel, "当前任务未找到流程定义模型");
 
             // 查找模型节点
-            NodeModel nodeModel = processModel.getNode(nodeName);
+            NodeModel nodeModel = processModel.getNodeById(nodeName);
             Assert.isNull(nodeModel, "根据节点名称[" + nodeName + "]无法找到节点模型");
 
             // 创建当前节点任务

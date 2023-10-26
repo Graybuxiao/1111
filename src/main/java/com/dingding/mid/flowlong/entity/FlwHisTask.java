@@ -65,6 +65,9 @@ public class FlwHisTask extends FlwTask {
         hisTask.actionUrl = flwTask.getActionUrl();
         hisTask.variable = flwTask.getVariable();
         hisTask.expireTime = flwTask.getExpireTime();
+        hisTask.assignor = flwTask.getAssignor();
+        hisTask.assignorId = flwTask.getAssignorId();
+
         return hisTask;
     }
 

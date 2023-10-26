@@ -36,6 +36,9 @@ import com.dingding.mid.flowlong.model.ProcessModel;
 import java.util.List;
 import java.util.Map;
 
+import static com.dingding.mid.common.CommonConstants.BUSINESS_STATUS_3;
+import static com.dingding.mid.common.CommonConstants.PROCESS_STATUS;
+
 /**
  * 流程实例运行业务类
  *
@@ -175,6 +178,9 @@ public class RuntimeServiceImpl implements RuntimeService {
 
             // 更新历史实例设置状态为终止
             FlwHisInstance flwHisInstance = FlwHisInstance.of(flwInstance, InstanceState.termination);
+            Map<String, Object> variableMap = flwHisInstance.getVariableMap();
+            variableMap.put(PROCESS_STATUS,BUSINESS_STATUS_3);
+            flwHisInstance.setVariable(variableMap);
             flwHisInstance.setEndTime(DateUtils.getCurrentDate());
             hisInstanceMapper.updateById(flwHisInstance);
 
