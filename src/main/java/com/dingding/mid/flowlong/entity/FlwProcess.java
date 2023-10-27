@@ -150,7 +150,10 @@ public class FlwProcess extends FlowEntity {
         }
 
         //如果当前节点不是条件分支的子节点、而是条件审批的子节点
-        if (parentNode.isConditionNode() && !parentNode.getChildNode().getNodeName().equals(nodeModel.getNodeName())) {
+        //todo 我尼玛?JDK的bug????
+        Boolean result=(parentNode.isConditionNode() && !parentNode.getChildNode().getNodeId().equals(nodeModel.getNodeId()));
+//        if (result/*parentNode.isConditionNode() && !parentNode.getChildNode().getNodeId().equals(nodeModel.getNodeId())*/) {
+        if (parentNode.isConditionNode() && !parentNode.getChildNode().getNodeId().equals(nodeModel.getNodeId())) {
             // 条件执行节点，返回子节点
             return parentNode.getChildNode();
         }

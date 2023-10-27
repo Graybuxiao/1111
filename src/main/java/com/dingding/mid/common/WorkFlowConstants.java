@@ -5,6 +5,7 @@ package com.dingding.mid.common;
  * @create 2022-10-10 17:40
  */
 public interface WorkFlowConstants {
+    String SPEL_ROOT="SPELRootExpWoCaoSBNC";
     String PROCESS_JSON="processJson";
     String FORM_JSON="formJson";
     String SETTING_JSON="settingJson";

@@ -5,6 +5,7 @@
  */
 package com.dingding.mid.flowlong.model;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.dingding.mid.dto.json.ChildNode;
 import com.dingding.mid.flowlong.Expression;
 import com.dingding.mid.flowlong.ModelInstance;
@@ -138,27 +139,56 @@ public class NodeModel extends BaseEx implements ModelInstance {
             Assert.illegalArgument(ObjectUtils.isEmpty(args), "Execution parameter cannot be empty");
             Expression expression = flowLongContext.getExpression();
             Assert.isNull(expression, "Interface Expression not implemented");
-            Optional<ConditionNode> conditionNodeOptional = this.getConditionNodes().stream().sorted(Comparator.comparing(ConditionNode::getPriorityLevel))
-                    .filter(t -> {
+
+            List<ConditionNode> conditionNodes = this.getConditionNodes();
+            List<ConditionNode> newArrConditionNodes=new ArrayList<>();
+            for (ConditionNode conditionNode : conditionNodes) {
+                ConditionNode conditionNode1 = new ConditionNode();
+                BeanUtil.copyProperties(conditionNode,conditionNode1);
+                newArrConditionNodes.add(conditionNode1);
+            }
 
 
-                        final String methodStr = t.getMethodStr();
-                        boolean result = true;
-                        if (null != methodStr) {
-                            try {
-                                result = expression.eval(Boolean.class, methodStr, args);
-                            } catch (Throwable e) {
-                                result = false;
-                                e.printStackTrace();
-                            }
-                        }
-                        return result;
-                    }).findFirst();
-            Assert.isFalse(conditionNodeOptional.isPresent(), "Not found executable ConditionNode");
-            /**
-             * 执行创建条件任务
-             */
-            this.createTask(conditionNodeOptional.get().getChildNode(), flowLongContext, execution);
+            ConditionNode defaultConditionNode= null;
+            for (ConditionNode node : newArrConditionNodes) {
+                if(Boolean.TRUE.equals(node.getTypeElse())){
+                    defaultConditionNode=node;
+                }
+            }
+            //先移除默认条件分支
+            newArrConditionNodes.remove(defaultConditionNode);
+
+            ConditionNode trueConditionNode=null;
+            //
+            Boolean result=Boolean.FALSE;
+            for (ConditionNode node : newArrConditionNodes) {
+                String methodStr = node.getMethodStr();
+                if (null != methodStr) {
+                    try {
+                        result = expression.eval(Boolean.class, methodStr, args);
+                        trueConditionNode=node;
+                        break;//有true直接返回
+                    } catch (Throwable e) {
+                        result = false;
+                        e.printStackTrace();
+                    }
+                }
+
+            }
+
+            //说明非默认都为true
+            if(Boolean.FALSE.equals(result)){
+                /**
+                 * 执行创建条件任务
+                 */
+                this.createTask(defaultConditionNode.getChildNode(), flowLongContext, execution);
+            }
+            else{
+                /**
+                 * 执行创建条件任务
+                 */
+                this.createTask(trueConditionNode.getChildNode(), flowLongContext, execution);
+            }
         }
 
         /**

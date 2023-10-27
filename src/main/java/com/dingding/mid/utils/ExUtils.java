@@ -54,8 +54,9 @@ public class ExUtils {
     }
 
 
-    public static Boolean userStrContainsMethod(String controlId, Object fromText){
-        if(fromText instanceof Integer){
+    public static Boolean userStrContainsMethod(String controlId, String fromText){
+        //cintroId 是 前端选过来的
+        //fromText是后端传过来的
             List<UserInfo> userInfos = JSONObject.parseObject(controlId, new TypeReference<List<UserInfo>>() {
             });
             List<String> idsList= new ArrayList<>();
@@ -70,24 +71,6 @@ public class ExUtils {
                 return Boolean.FALSE;
             }
             return Boolean.TRUE;
-
-        }
-        else{
-            List<UserInfo> userInfos = JSONObject.parseObject(controlId, new TypeReference<List<UserInfo>>() {
-            });
-            List<String> idsList= new ArrayList<>();
-            for (UserInfo userInfo : userInfos) {
-                idsList.add(userInfo.getId());
-            }
-            String str=fromText+"";
-            String[] split = str.split(",");
-            List<String> strings = Arrays.asList(split);
-            Collection<String> intersection = CollUtil.intersection(strings, idsList);
-            if(CollUtil.isEmpty(intersection)){
-                return Boolean.FALSE;
-            }
-            return Boolean.TRUE;
-        }
     }
 
 

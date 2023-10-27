@@ -196,6 +196,13 @@ public class ProcessModel {
                 nodeModel.setExamineMode(3);
             }
             viewNodeModel.setChildNode(nodeModel);
+            NodeModel tempParentNode = viewNodeModel.getTempParentNode();
+            if(tempParentNode==null){
+                nodeModel.setParentNode((NodeModel) viewNodeModel);
+            }
+            else{
+                nodeModel.setParentNode(tempParentNode);
+            }
             iteratorChildNode(childNode.getChildren(),processModel,nodeModel);
         }
         else if(TypesEnums.CC.getType().equals(childNode.getType())){
@@ -222,6 +229,13 @@ public class ProcessModel {
                 nodeModel.setUserSelectFlag(Boolean.FALSE);
             }
             viewNodeModel.setChildNode(nodeModel);
+            NodeModel tempParentNode = viewNodeModel.getTempParentNode();
+            if(tempParentNode==null){
+                nodeModel.setParentNode((NodeModel) viewNodeModel);
+            }
+            else{
+                nodeModel.setParentNode(tempParentNode);
+            }
             iteratorChildNode(childNode.getChildren(),processModel,nodeModel);
         }
         else if(TypesEnums.CONDITIONS.getType().equals(childNode.getType())){
@@ -238,19 +252,21 @@ public class ProcessModel {
                 conditionModel.setNodeName(branch.getName());
                 conditionModel.setType(4);
                 conditionModel.setPriorityLevel(1);
+                conditionModel.setTypeElse(branch.getTypeElse());
                 List<GroupsInfo> groups = branch.getProps().getGroups();
                 String groupsType = branch.getProps().getGroupsType();
                 String methodStr = dueMethodStr(groups, groupsType);
                 conditionModel.setMethodStr(methodStr);
                 //
                 conditionNodes.add(conditionModel);
+                conditionModel.setTempParentNode(nodeModel);
                 iteratorChildNode(branch.getChildren(),processModel,conditionModel);
 
             }
             nodeModel.setConditionNodes(conditionNodes);
             ChildNode children = childNode.getChildren();
-            if(children!=null&&(!"EMPTY".equals(children.getType()))){
-                iteratorChildNode(childNode.getChildren(),processModel,nodeModel);
+            if(children!=null&&("EMPTY".equals(children.getType()) && children.getChildren()!=null)  ){
+                iteratorChildNode(children.getChildren(),processModel,nodeModel);
             }
         }
     }
@@ -329,6 +345,10 @@ public class ProcessModel {
                         JSONObject obj=(JSONObject)o;
                         userIds.add(obj.getString("id"));
                     }
+                    //SPEL 敏感
+                    if("root".equalsIgnoreCase(id)){
+                        id=SPEL_ROOT;
+                    }
                     String str=" "+ EXPRESSION_CLASS+"userStrContainsMethod(#"+id+",\"{0}\") ";
                     str = str.replace("{0}", StringUtils.join(userIds, ","));
                     conditionExpression.append(str );
@@ -338,6 +358,9 @@ public class ProcessModel {
                     for (Object o : value) {
                         JSONObject obj=(JSONObject)o;
                         userIds.add(obj.getString("id"));
+                    }
+                    if("root".equalsIgnoreCase(id)){
+                        id=SPEL_ROOT;
                     }
                     String str=" "+ EXPRESSION_CLASS+"deptStrContainsMethod(\"{0}\",\"{1}\") ";
                     str = str.replace("{0}", "#"+id);

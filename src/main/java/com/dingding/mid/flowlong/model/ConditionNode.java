@@ -47,6 +47,9 @@ public class ConditionNode extends BaseEx {
 //    private List<GroupsInfo> groups;
 //    private String groupsType;
     private String methodStr;
+    private Boolean typeElse;
+
+
 
 
     /**

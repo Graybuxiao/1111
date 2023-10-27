@@ -11,4 +11,5 @@ public class BaseEx {
     private String nodeId;
     private NodeModel childNode;
     private List<ConditionNode> conditionNodes;
+    private NodeModel tempParentNode;
 }

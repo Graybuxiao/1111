@@ -122,6 +122,7 @@ public class WorkspaceProcessController {
             processVariables.put(START_USER_INFO,JSONObject.toJSONString(startUserInfo));
             ArrayList<UserInfo> userInfos = CollUtil.newArrayList(startUserInfo);
             processVariables.put("root",JSONObject.toJSONString(userInfos));
+            processVariables.put(SPEL_ROOT,JSONObject.toJSONString(userInfos));
             Map<String, List<UserInfo>> processUsers = startProcessInstanceDTO.getProcessUsers();
             if(CollUtil.isNotEmpty(processUsers)){
                 Set<String> strings = processUsers.keySet();
