@@ -73,55 +73,32 @@ public class ExUtils {
             return Boolean.TRUE;
     }
 
-
- /*   public Boolean deptStrContainsMethod(String controlId,String fromText,DelegateExecution execution){
-        Object executionVariable = execution.getVariable(controlId);
-        if(executionVariable instanceof String){
-            String variable = (String) execution.getVariable(controlId);
-            if(StringUtils.isBlank(variable)){
-                return Boolean.FALSE;
-            }
-            List<UserInfo> userInfos = JSONObject.parseObject(variable, new TypeReference<List<UserInfo>>() {
-            });
-            List<String> idsList= new ArrayList<>();
-            for (UserInfo userInfo : userInfos) {
-                idsList.add(userInfo.getId());
-            }
-            String[] split = fromText.split(",");
-            List<String> strings = Arrays.asList(split);
-            Collection<String> intersection = CollUtil.intersection(strings, idsList);
-            if(CollUtil.isEmpty(intersection)){
-                return Boolean.FALSE;
-            }
-            return Boolean.TRUE;
-
+    public static Boolean deptStrContainsMethod(String controlId, String fromText){
+        //cintroId 是 前端选过来的
+        //fromText是后端传过来的
+        List<UserInfo> userInfos = JSONObject.parseObject(controlId, new TypeReference<List<UserInfo>>() {
+        });
+        List<String> idsList= new ArrayList<>();
+        for (UserInfo userInfo : userInfos) {
+            idsList.add(userInfo.getId());
         }
-        else{
-            JSONArray variable = (JSONArray) execution.getVariable(controlId);
-            List<UserInfo> userInfos = JSONObject.parseObject(variable.toJSONString(), new TypeReference<List<UserInfo>>() {
-            });
-            List<String> idsList= new ArrayList<>();
-            for (UserInfo userInfo : userInfos) {
-                idsList.add(userInfo.getId());
-            }
-            String[] split = fromText.split(",");
-            List<String> strings = Arrays.asList(split);
-            Collection<String> intersection = CollUtil.intersection(strings, idsList);
-            if(CollUtil.isEmpty(intersection)){
-                return Boolean.FALSE;
-            }
-            return Boolean.TRUE;
+        String str=fromText+"";
+        String[] split = str.split(",");
+        List<String> strings = Arrays.asList(split);
+        Collection<String> intersection = CollUtil.intersection(strings, idsList);
+        if(CollUtil.isEmpty(intersection)){
+            return Boolean.FALSE;
         }
-
+        return Boolean.TRUE;
     }
-*/
 
 
-    public Boolean numberContains(Number controlId,Number...values){
+
+    public static  Boolean numberContains(Number controlId,Number...values){
         List<Number> list = Arrays.asList(values);
         return list.contains(controlId);
     }
-    public Boolean b(String controlId,Number...values){
+    public static  Boolean b(String controlId,Number...values){
         List<Number> numbers = Arrays.asList(values);
 
         Double a = Double.valueOf(controlId);
@@ -141,7 +118,7 @@ public class ExUtils {
 
 
 
-    public Boolean ab(String controlId,Number...values){
+    public static  Boolean ab(String controlId,Number...values){
         List<Number> numbers = Arrays.asList(values);
 
         Double a = Double.valueOf(controlId);
@@ -158,7 +135,7 @@ public class ExUtils {
         }
         return Boolean.FALSE;
     }
-    public Boolean ba(String controlId,Number...values){
+    public static  Boolean ba(String controlId,Number...values){
 
         List<Number> numbers = Arrays.asList(values);
 
@@ -178,7 +155,7 @@ public class ExUtils {
 
 
     }
-    public Boolean aba(String controlId,Number...values){
+    public static  Boolean aba(String controlId,Number...values){
         List<Number> numbers = Arrays.asList(values);
 
         Double a = Double.valueOf(controlId);
@@ -204,13 +181,13 @@ public class ExUtils {
      conditionExpression.append(" "+ EXPRESSION_CLASS+"numberLt("+id+","+str+") " );
      conditionExpression.append(" "+ EXPRESSION_CLASS+"numberLtEquals("+id+","+str+") " );
      */
-    public Boolean numberEquals(String controlId,String value){
+    public  static Boolean numberEquals(String controlId,String value){
         Double a = Double.valueOf(controlId);
         Double b = Double.valueOf(value);
         boolean equals = a.equals(b);
         return equals;
     }
-    public Boolean numberGt(String controlId,String value){
+    public  static Boolean numberGt(String controlId,String value){
         Double a = Double.valueOf(controlId);
         BigDecimal a1 = BigDecimal.valueOf(a);
         Double b = Double.valueOf(value);
@@ -219,7 +196,7 @@ public class ExUtils {
         return greater;
     }
 
-    public Boolean numberGtEquals(String controlId,String value){
+    public static  Boolean numberGtEquals(String controlId,String value){
         Double a = Double.valueOf(controlId);
         BigDecimal a1 = BigDecimal.valueOf(a);
         Double b = Double.valueOf(value);
@@ -236,7 +213,7 @@ public class ExUtils {
         boolean greater = NumberUtil.isLess(a1, a2);
         return greater;
     }
-    public Boolean numberLtEquals(String controlId,String value){
+    public  static Boolean numberLtEquals(String controlId,String value){
         Double a = Double.valueOf(controlId);
         BigDecimal a1 = BigDecimal.valueOf(a);
         Double b = Double.valueOf(value);

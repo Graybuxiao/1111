@@ -6,6 +6,10 @@ package com.dingding.mid.common;
  */
 public interface WorkFlowConstants {
     String SPEL_ROOT="SPELRootExpWoCaoSBNC";
+    /**
+     * wflow 发起人变量 恰巧是root 更巧的是 #root 是spel表达式关键字,绝绝子.
+     */
+    String ROOT_NODE="root";
     String PROCESS_JSON="processJson";
     String FORM_JSON="formJson";
     String SETTING_JSON="settingJson";
