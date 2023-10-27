@@ -55,10 +55,15 @@ public class NodeModel extends BaseEx implements ModelInstance {
      * 3，角色
      * 4，发起人自选
      * 5，发起人自己
+     * 6. 表单选人
      * 7，连续多级主管
      * </p>
      */
     private Integer setType;
+    /**
+     * 表单选人的话,,这个值
+     */
+    private String formField;
     /**
      * 审核人成员
      */

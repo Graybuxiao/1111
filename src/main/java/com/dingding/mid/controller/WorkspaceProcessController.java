@@ -121,7 +121,7 @@ public class WorkspaceProcessController {
             processVariables.put(PROCESS_STATUS,BUSINESS_STATUS_1);
             processVariables.put(START_USER_INFO,JSONObject.toJSONString(startUserInfo));
             ArrayList<UserInfo> userInfos = CollUtil.newArrayList(startUserInfo);
-            processVariables.put("root",JSONObject.toJSONString(userInfos));
+            processVariables.put(ROOT_NODE,JSONObject.toJSONString(userInfos));
             processVariables.put(SPEL_ROOT,JSONObject.toJSONString(userInfos));
             Map<String, List<UserInfo>> processUsers = startProcessInstanceDTO.getProcessUsers();
             if(CollUtil.isNotEmpty(processUsers)){
@@ -1578,7 +1578,7 @@ public class WorkspaceProcessController {
 
         List<TaskDetailVO> taskDetailVOS= new ArrayList<>();
         for (FlwHisTask historicActivityInstance : list) {
-            if("root".equals(historicActivityInstance.getTaskNodeId())){
+            if(ROOT_NODE.equals(historicActivityInstance.getTaskNodeId())){
                 TaskDetailVO taskDetailVO= new TaskDetailVO();
                 taskDetailVO.setTaskId(historicActivityInstance.getId()+"");
                 taskDetailVO.setActivityId(historicActivityInstance.getTaskNodeId());

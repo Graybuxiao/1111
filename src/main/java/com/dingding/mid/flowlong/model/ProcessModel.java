@@ -346,7 +346,7 @@ public class ProcessModel {
                         userIds.add(obj.getString("id"));
                     }
                     //SPEL 敏感
-                    if("root".equalsIgnoreCase(id)){
+                    if(ROOT_NODE.equalsIgnoreCase(id)){
                         id=SPEL_ROOT;
                     }
                     String str=" "+ EXPRESSION_CLASS+"userStrContainsMethod(#"+id+",\"{0}\") ";
@@ -359,7 +359,7 @@ public class ProcessModel {
                         JSONObject obj=(JSONObject)o;
                         userIds.add(obj.getString("id"));
                     }
-                    if("root".equalsIgnoreCase(id)){
+                    if(ROOT_NODE.equalsIgnoreCase(id)){
                         id=SPEL_ROOT;
                     }
                     String str=" "+ EXPRESSION_CLASS+"deptStrContainsMethod(\"{0}\",\"{1}\") ";
@@ -454,6 +454,12 @@ public class ProcessModel {
                 Integer endLevel = MapUtil.getInt(leaderTop, "endLevel");
                 nodeModel.setDirectorLevel(endLevel);
             }
+        }
+
+        else if(AssigneeTypeEnums.FORM_USER.getTypeName().equals(assignedType)){
+            nodeModel.setSetType(6);
+            String formUser = childNode.getProps().getFormUser();
+            nodeModel.setFormField(formUser);
         }
     }
 

@@ -18,8 +18,10 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.map.MapUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dingding.mid.dto.json.UserInfo;
+import com.dingding.mid.entity.Users;
 import com.dingding.mid.flowlong.TaskAccessStrategy;
 import com.dingding.mid.flowlong.TaskService;
 import com.dingding.mid.flowlong.assist.Assert;
@@ -38,10 +40,15 @@ import com.dingding.mid.flowlong.mapper.*;
 import com.dingding.mid.flowlong.model.NodeAssignee;
 import com.dingding.mid.flowlong.model.NodeModel;
 import com.dingding.mid.flowlong.model.ProcessModel;
+import com.dingding.mid.service.UserService;
+import com.dingding.mid.utils.SpringContextHolder;
 
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+
+import static com.dingding.mid.common.WorkFlowConstants.ROOT_NODE;
+import static com.dingding.mid.common.WorkFlowConstants.VIEW_ID_NAME;
 
 /**
  * 任务执行业务类
@@ -436,13 +443,18 @@ public class TaskServiceImpl implements TaskService {
 
         // 处理流程任务
         Integer nodeType = nodeModel.getType();
-        if (0 == nodeType || 1 == nodeType) {
+        if (0 == nodeType ) {
             /**
              * 0，发起人 1，审批人
              */
             PerformType performType = PerformType.get(nodeModel.getExamineMode());
             flwTasks.addAll(this.saveTask(flwTask, performType, taskActors, execution));
-        } else if (2 == nodeType) {
+        }
+        else if (1 == nodeType) {
+            PerformType performType = PerformType.get(nodeModel.getExamineMode());
+            flwTasks.addAll(this.saveTask(flwTask, performType, taskActors, execution));
+        }
+        else if (2 == nodeType) {
             /**
              * 2，抄送任务
              */
@@ -619,9 +631,10 @@ public class TaskServiceImpl implements TaskService {
      */
     private List<FlwTaskActor> getTaskActors(NodeModel nodeModel, Execution execution) {
         List<FlwTaskActor> flwHisTaskActors = new ArrayList<>();
+        Map<String, Object> args = execution.getArgs();
         if(0==nodeModel.getType()){
-            Map<String, Object> args = execution.getArgs();
-            String root = MapUtil.getStr(args, "root");
+
+            String root = MapUtil.getStr(args, ROOT_NODE);
             List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
             });
             UserInfo userInfo = userInfos.get(0);
@@ -629,6 +642,14 @@ public class TaskServiceImpl implements TaskService {
         }
         else{
             if (ObjectUtils.isNotEmpty(nodeModel.getNodeUserList())) {
+                /**
+                 * 1，指定成员
+                 * 2，主管
+                 * 3，角色
+                 * 4，发起人自选
+                 * 5，发起人自己
+                 * 7，连续多级主管
+                 */
                 Integer setType = nodeModel.getSetType();
                 //指定成员
                 if(1==setType){
@@ -636,32 +657,70 @@ public class TaskServiceImpl implements TaskService {
                 }
                 //主管
                 else if(2==setType){
+                    UserService userService = SpringContextHolder.getBean(UserService.class);
+                    String root = MapUtil.getStr(args, ROOT_NODE);
+                    List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
+                    });
+                    UserInfo userInfo = userInfos.get(0);
+                    String id = userInfo.getId();
+                    Users users = userService.getById(id);
+                    //todo 因为此项目没有级联结构,自行递归获取1~10级某一级,不会有人这都不会吧,嘤嘤嘤
+                    Integer admin = users.getAdmin();
+                    if(admin!=null){
+                        flwHisTaskActors.add(FlwTaskActor.ofUser(admin+"",users.getUserName()));
+                    }
 
                 }
-                //发起人自选..flowlong做不了, 因为没有唯一id
-                else if(4==setType){
-//                Map<String, Object> args = execution.getArgs();
-//                args.get(nodeModel.)
-                }
+
                 else if(7==setType){
-//                Map<String, Object> args = execution.getArgs();
-//                String root = MapUtil.getStr(args, "root");
-//                List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
-//                });
-//                UserInfo userInfo = userInfos.get(0);
-//                flwHisTaskActors.add(FlwTaskActor.ofUser(userInfo.getId(), userInfo.getName());
+                    UserService userService = SpringContextHolder.getBean(UserService.class);
+                    String root = MapUtil.getStr(args, ROOT_NODE);
+                    List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
+                    });
+                    UserInfo userInfo = userInfos.get(0);
+                    String id = userInfo.getId();
+                    Users users = userService.getById(id);
+                    //todo 因为此项目没有级联结构,自行递归获取1~10级的所有,不会有人这都不会吧,嘤嘤嘤
+                    Integer admin = users.getAdmin();
+                    if(admin!=null){
+                        flwHisTaskActors.add(FlwTaskActor.ofUser(admin+"",users.getUserName()));
+                    }
                 }
-
-
-
             }
             else if (ObjectUtils.isNotEmpty(nodeModel.getNodeRoleList())) {
-                // 指定角色审批
-                nodeModel.getNodeRoleList().forEach(t -> flwHisTaskActors.add(FlwTaskActor.ofRole(t.getId(), t.getName())));
+                List<String> roleIds =new ArrayList<>();
+                for (NodeAssignee nodeAssignee : nodeModel.getNodeRoleList()) {
+                    roleIds.add(nodeAssignee.getId());
+                }
+                LambdaQueryWrapper<Users> lambdaQueryWrapper=new LambdaQueryWrapper<>();
+                lambdaQueryWrapper.in(Users::getDepartmentIds,roleIds);
+                UserService userService = SpringContextHolder.getBean(UserService.class);
+                List<Users> list = userService.list(lambdaQueryWrapper);
+                for (Users users : list) {
+                    flwHisTaskActors.add(FlwTaskActor.ofUser(users.getUserId()+"",users.getUserName()));
+                }
+            }
+            //发起人自选..
+            else if(4==nodeModel.getSetType()) {
+                List<String> o = (List<String>) args.get(nodeModel.getNodeId());
+                if (CollUtil.isNotEmpty(o)) {
+                    for (String userstr : o) {
+                        flwHisTaskActors.add(FlwTaskActor.ofUser(userstr, "没卵用"));
+                    }
+                }
+            }
+            else if(6==nodeModel.getSetType()) {
+                String formUser = nodeModel.getFormField();
+                List<LinkedHashMap> assigneeUsers = (List<LinkedHashMap>) args.get(formUser);
+                if(assigneeUsers!=null){
+                    for (LinkedHashMap assigneeUser : assigneeUsers) {
+                        FlwTaskActor flwTaskActor = FlwTaskActor.ofUser(assigneeUser.get("id")+"", assigneeUser.get("name")+"");
+                        flwHisTaskActors.add(flwTaskActor);
+                    }
+                }
             }
             else if(5==nodeModel.getSetType()){
-                Map<String, Object> args = execution.getArgs();
-                String root = MapUtil.getStr(args, "root");
+                String root = MapUtil.getStr(args, ROOT_NODE);
                 List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
                 });
                 UserInfo userInfo = userInfos.get(0);
