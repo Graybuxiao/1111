@@ -777,6 +777,15 @@ public class TaskServiceImpl implements TaskService {
             UserInfo userInfo = userInfos.get(0);
             flwHisTaskActors.add(FlwTaskActor.ofUser(userInfo.getId(), userInfo.getName()));
         }
+        else if(2==nodeModel.getType()){
+
+//            String root = MapUtil.getStr(args, ROOT_NODE);
+//            List<UserInfo> userInfos = JSONObject.parseObject(root, new TypeReference<List<UserInfo>>() {
+//            });
+//            UserInfo userInfo = userInfos.get(0);
+//            flwHisTaskActors.add(FlwTaskActor.ofUser(userInfo.getId(), userInfo.getName()));
+        }
+
         else{
             if (ObjectUtils.isNotEmpty(nodeModel.getNodeUserList())) {
                 /**
