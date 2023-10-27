@@ -205,6 +205,72 @@ public class ProcessModel {
             }
             iteratorChildNode(childNode.getChildren(),processModel,nodeModel);
         }
+        else if(TypesEnums.APPROVE_USER_TASK.getType().equals(childNode.getType())){
+            NodeModel nodeModel = new NodeModel();
+            nodeModel.setNodeId(childNode.getId());
+            nodeModel.setNodeName(childNode.getName());
+            nodeModel.setType(typeConvert(childNode.getType()));
+            setTypeConvert(childNode.getProps().getAssignedType(),nodeModel,childNode);
+            //设置超时时间
+            JSONObject timeLimit = childNode.getProps().getTimeLimit();
+            if(timeLimit!=null && !timeLimit.isEmpty()){
+
+                JSONObject timeout = timeLimit.getJSONObject("timeout");
+                String value = timeout.getString("value");
+                String unit = timeout.getString("unit");
+                if(value!=null&& Integer.valueOf(value)>0){
+                    nodeModel.setTermAuto(Boolean.TRUE);
+                    Integer integer = Integer.valueOf(value);
+                    if("D".equals(unit)){
+                        nodeModel.setTerm(integer*24);
+                    }
+                    else if("H".equals(unit)){
+                        nodeModel.setTerm(integer);
+                    }
+
+                    //设置->
+                    JSONObject handler = timeLimit.getJSONObject("handler");
+                    String type = handler.getString("type");
+                    if("PASS".equals(type)){
+                        nodeModel.setTermMode(0);
+                    }
+                    else if("REFUSE".equals(type)){
+                        nodeModel.setTermMode(1);
+                    }
+                }
+                else{
+                    nodeModel.setTermAuto(Boolean.FALSE);
+                }
+            }
+            else{
+                nodeModel.setTermAuto(Boolean.FALSE);
+            }
+            //设置会签
+            /*
+            *           <el-radio label="NEXT">会签 （按选择顺序审批，每个人必须同意）</el-radio>
+            <el-radio label="AND">会签（可同时审批，每个人必须同意）</el-radio>
+            <el-radio label="OR">或签（有一人同意即可）</el-radio>
+            * */
+            String mode = childNode.getProps().getMode();
+            if("NEXT".equals(mode)){
+                nodeModel.setExamineMode(1);
+            }
+            else if("AND".equals(mode)){
+                nodeModel.setExamineMode(2);
+            }
+            else if("OR".equals(mode)){
+                nodeModel.setExamineMode(3);
+            }
+            viewNodeModel.setChildNode(nodeModel);
+            NodeModel tempParentNode = viewNodeModel.getTempParentNode();
+            if(tempParentNode==null){
+                nodeModel.setParentNode((NodeModel) viewNodeModel);
+            }
+            else{
+                nodeModel.setParentNode(tempParentNode);
+            }
+            iteratorChildNode(childNode.getChildren(),processModel,nodeModel);
+        }
         else if(TypesEnums.CC.getType().equals(childNode.getType())){
             NodeModel nodeModel = new NodeModel();
             nodeModel.setNodeId(childNode.getId());
@@ -362,9 +428,8 @@ public class ProcessModel {
                     if(ROOT_NODE.equalsIgnoreCase(id)){
                         id=SPEL_ROOT;
                     }
-                    String str=" "+ EXPRESSION_CLASS+"deptStrContainsMethod(\"{0}\",\"{1}\") ";
-                    str = str.replace("{0}", "#"+id);
-                    str = str.replace("{1}", StringUtils.join(userIds, ","));
+                    String str=" "+ EXPRESSION_CLASS+"deptStrContainsMethod(#"+id+",\"{0}\") ";
+                    str = str.replace("{0}", StringUtils.join(userIds, ","));
                     conditionExpression.append(str );
                 }
                 else{

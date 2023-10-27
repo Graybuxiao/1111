@@ -19,6 +19,7 @@ public enum TypesEnums {
      * 任务
      */
     USER_TASK("APPROVAL"/*, UserTask.class*/),
+    APPROVE_USER_TASK("TASK"/*, UserTask.class*/),
     EMPTY("EMPTY"/*, Object.class*/),
     ROOT("ROOT"/*, UserTask.class*/),
     CC("CC"/*, ServiceTask.class*/),
