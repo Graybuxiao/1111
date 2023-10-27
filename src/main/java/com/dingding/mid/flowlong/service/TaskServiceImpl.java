@@ -13,13 +13,21 @@
  * limitations under the License.
  */
 package com.dingding.mid.flowlong.service;
+import java.util.List;
+import java.util.Map;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.map.MapUtil;
+import cn.hutool.http.HttpConfig;
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
+import cn.hutool.http.HttpUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.dingding.mid.dto.json.HttpInfo;
 import com.dingding.mid.dto.json.UserInfo;
 import com.dingding.mid.entity.Users;
 import com.dingding.mid.flowlong.TaskAccessStrategy;
@@ -434,45 +442,174 @@ public class TaskServiceImpl implements TaskService {
      */
     @Override
     public List<FlwTask> createTask(NodeModel nodeModel, Execution execution) {
-        // 构建任务
-        FlwTask flwTask = this.createTaskBase(nodeModel, execution);
 
-        // 模型中获取参与者信息
-        List<FlwTaskActor> taskActors = this.getTaskActors(nodeModel, execution);
-        List<FlwTask> flwTasks = new LinkedList<>();
+
 
         // 处理流程任务
         Integer nodeType = nodeModel.getType();
-        if (0 == nodeType ) {
-            /**
-             * 0，发起人 1，审批人
-             */
-            PerformType performType = PerformType.get(nodeModel.getExamineMode());
-            flwTasks.addAll(this.saveTask(flwTask, performType, taskActors, execution));
-        }
-        else if (1 == nodeType) {
-            PerformType performType = PerformType.get(nodeModel.getExamineMode());
-            flwTasks.addAll(this.saveTask(flwTask, performType, taskActors, execution));
-        }
-        else if (2 == nodeType) {
+        if (5 == nodeType) {
             /**
              * 2，抄送任务
              */
-            this.saveTaskCc(nodeModel, execution);
+            this.saveTrigger(nodeModel, execution);
             NodeModel nextNode = nodeModel.getChildNode();
             if (null != nextNode) {
                 // 继续创建普通任务
                 this.createTask(nextNode, execution);
             }
-        } else if (3 == nodeType) {
-            /**
-             * 3，条件审批
-             */
-            FlwTask singleFlwTask = flwTask.cloneTask(null);
-            PerformType performType = PerformType.get(nodeModel.getExamineMode());
-            flwTasks.addAll(this.saveTask(singleFlwTask, performType, taskActors, execution));
+            return new ArrayList<>();
         }
-        return flwTasks;
+        else{
+            // 构建任务
+            FlwTask flwTask = this.createTaskBase(nodeModel, execution);
+
+            // 模型中获取参与者信息
+            List<FlwTaskActor> taskActors = this.getTaskActors(nodeModel, execution);
+            List<FlwTask> flwTasks = new LinkedList<>();
+            if (0 == nodeType ) {
+                /**
+                 * 0，发起人 1，审批人
+                 */
+                PerformType performType = PerformType.get(nodeModel.getExamineMode());
+                flwTasks.addAll(this.saveTask(flwTask, performType, taskActors, execution));
+            }
+            else if (1 == nodeType) {
+                PerformType performType = PerformType.get(nodeModel.getExamineMode());
+                flwTasks.addAll(this.saveTask(flwTask, performType, taskActors, execution));
+            }
+            else if (2 == nodeType) {
+                /**
+                 * 2，抄送任务
+                 */
+                this.saveTaskCc(nodeModel, execution);
+                NodeModel nextNode = nodeModel.getChildNode();
+                if (null != nextNode) {
+                    // 继续创建普通任务
+                    this.createTask(nextNode, execution);
+                }
+            }
+            else if (3 == nodeType) {
+                /**
+                 * 3，条件审批
+                 */
+                FlwTask singleFlwTask = flwTask.cloneTask(null);
+                PerformType performType = PerformType.get(nodeModel.getExamineMode());
+                flwTasks.addAll(this.saveTask(singleFlwTask, performType, taskActors, execution));
+            }
+            return flwTasks;
+        }
+
+
+
+
+
+    }
+
+    private void saveTrigger(NodeModel nodeModel, Execution execution) {
+        //发请求
+        HttpInfo httpInfo = nodeModel.getHttpInfo();
+        Map<String, Object> args = execution.getArgs();
+        String method = httpInfo.getMethod();
+        String url = httpInfo.getUrl();
+        List<Map<String, Object>> headers = httpInfo.getHeaders();
+        String contentType = httpInfo.getContentType();
+        List<Map<String, Object>> params = httpInfo.getParams();
+        Integer retry = httpInfo.getRetry();
+        String success = httpInfo.getSuccess();
+        String fail = httpInfo.getFail();
+        if("get".equalsIgnoreCase(method)){
+            HttpRequest get = HttpUtil.createGet(url);
+            Map<String,String> map= new HashMap<>();
+            for (Map<String, Object> header : headers) {
+                String name = MapUtil.getStr(header, "name");
+                String value = MapUtil.getStr(header, "value");
+                Boolean isField = MapUtil.getBool(header, "isField");
+                if(isField){
+                    String o = args.get(name).toString();
+                    map.put(name,o);
+                }
+                else{
+                    map.put(name,value);
+                }
+            }
+            if("FORM".equalsIgnoreCase(contentType)){
+
+            }else{
+                map.put("Content-Type","application\\json");
+            }
+
+            get.addHeaders(map);
+
+            Map<String,String> mapEx= new HashMap<>();
+
+            for (Map<String, Object> param : params) {
+                String name = MapUtil.getStr(param, "name");
+                String value = MapUtil.getStr(param, "value");
+                Boolean isField = MapUtil.getBool(param, "isField");
+                if(isField){
+                    String o = args.get(name).toString();
+                    mapEx.put(name,o);
+                }
+                else{
+                    mapEx.put(name,value);
+                }
+            }
+
+            get.formStr(mapEx);
+
+
+            HttpResponse execute = get.execute();
+            System.err.println(execute);
+
+
+        }
+        else{
+            HttpRequest get = HttpUtil.createPost(url);
+            Map<String,String> map= new HashMap<>();
+            for (Map<String, Object> header : headers) {
+                String name = MapUtil.getStr(header, "name");
+                String value = MapUtil.getStr(header, "value");
+                Boolean isField = MapUtil.getBool(header, "isField");
+                if(isField){
+                    String o = args.get(name).toString();
+                    map.put(name,o);
+                }
+                else{
+                    map.put(name,value);
+                }
+            }
+            if("FORM".equalsIgnoreCase(contentType)){
+                map.put("Content-Type","application/x-www-form-urlencoded");
+            }else{
+                map.put("Content-Type","application/json");
+            }
+
+            get.addHeaders(map);
+
+            Map<String,String> mapEx= new HashMap<>();
+
+            for (Map<String, Object> param : params) {
+                String name = MapUtil.getStr(param, "name");
+                String value = MapUtil.getStr(param, "value");
+                Boolean isField = MapUtil.getBool(param, "isField");
+                if(isField){
+                    String o = args.get(name).toString();
+                    mapEx.put(name,o);
+                }
+                else{
+                    mapEx.put(name,value);
+                }
+            }
+
+            get.body(JSONObject.toJSONString(mapEx, SerializerFeature.WriteMapNullValue));
+
+
+            HttpResponse execute = get.execute();
+            System.err.println(execute);
+
+
+        }
+
     }
 
     /**

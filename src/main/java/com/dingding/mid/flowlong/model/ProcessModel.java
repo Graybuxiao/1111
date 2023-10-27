@@ -304,6 +304,23 @@ public class ProcessModel {
             }
             iteratorChildNode(childNode.getChildren(),processModel,nodeModel);
         }
+        else if(TypesEnums.TRIGGER.getType().equals(childNode.getType())){
+            NodeModel nodeModel = new NodeModel();
+            nodeModel.setNodeId(childNode.getId());
+            nodeModel.setNodeName(childNode.getName());
+            nodeModel.setType(typeConvert(childNode.getType()));
+            HttpInfo http = childNode.getProps().getHttp();
+            nodeModel.setHttpInfo(http);
+            viewNodeModel.setChildNode(nodeModel);
+            NodeModel tempParentNode = viewNodeModel.getTempParentNode();
+            if(tempParentNode==null){
+                nodeModel.setParentNode((NodeModel) viewNodeModel);
+            }
+            else{
+                nodeModel.setParentNode(tempParentNode);
+            }
+            iteratorChildNode(childNode.getChildren(),processModel,nodeModel);
+        }
         else if(TypesEnums.CONDITIONS.getType().equals(childNode.getType())){
             NodeModel nodeModel = new NodeModel();
             nodeModel.setNodeId(childNode.getId());
@@ -550,6 +567,9 @@ public class ProcessModel {
         }
         else if(TypesEnums.CONDITION.getType().equals(type)){
             return 4;
+        }
+        else if(TypesEnums.TRIGGER.getType().equals(type)){
+            return 5;
         }
         else {
             throw new WorkFlowException("sb+nc");

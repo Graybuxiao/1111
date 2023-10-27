@@ -7,6 +7,7 @@ package com.dingding.mid.flowlong.model;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.dingding.mid.dto.json.ChildNode;
+import com.dingding.mid.dto.json.HttpInfo;
 import com.dingding.mid.flowlong.Expression;
 import com.dingding.mid.flowlong.ModelInstance;
 import com.dingding.mid.flowlong.assist.Assert;
@@ -30,6 +31,12 @@ import java.util.*;
 @Getter
 @Setter
 public class NodeModel extends BaseEx implements ModelInstance {
+    ///////////触发器start/////////////////
+    private HttpInfo httpInfo;
+    ///////////触发器end//////////////////
+
+
+
     //todo 暂时把childNode存进去,因为不想去修改前端渲染方式
     private ChildNode wChildNode;
     /**
@@ -44,6 +51,8 @@ public class NodeModel extends BaseEx implements ModelInstance {
      * 2，抄送人
      * 3，条件审批
      * 4，条件分支
+     * 5. 触发器
+     *
      * </p>
      */
     private Integer type;
@@ -199,7 +208,7 @@ public class NodeModel extends BaseEx implements ModelInstance {
         /**
          * 执行创建抄送、审批任务
          */
-        if (Objects.equals(2, this.type) || Objects.equals(1, this.type)) {
+        if (Objects.equals(2, this.type) || Objects.equals(1, this.type) ||Objects.equals(5, this.type)) {
             this.createTask(flowLongContext, execution);
         }
     }

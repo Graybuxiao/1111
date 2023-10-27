@@ -42,7 +42,8 @@ public enum TaskType {
     /**
      * 会签
      */
-    countersign(3);
+    countersign(3),
+    trigger(5);
 
     private final int value;
 
