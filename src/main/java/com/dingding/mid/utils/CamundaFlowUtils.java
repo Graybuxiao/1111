@@ -38,25 +38,22 @@ public class CamundaFlowUtils {
     @Resource
     private HistoryService historyService;
     public List<String> calculateTaskCandidateUsers(DelegateExecution execution) {
-        if(StringUtils.isBlank(execution.getCurrentActivityId())){
-            Map<String, Object> variables = execution.getVariables();
-            Set<String> strings = variables.keySet();
-            String variableName="";
-            for (String string : strings) {
-                if(string.endsWith("AssigneeList")){
-                    variableName=string;
-                }
-            }
-            List list = MapUtil.get(variables, variableName, List.class);
-            return list;
+        String currentActivityId=execution.getCurrentActivityId();
+        String activityInstanceId = execution.getActivityInstanceId();
+
+        log.debug("calculateTaskCandidateUsers_ProcessInstanceId:{},activityInstanceId:{}，currentActivityId:{}"
+                ,execution.getProcessInstanceId(),activityInstanceId,currentActivityId);
+
+        if(StringUtils.isBlank(currentActivityId) && StringUtils.isNotEmpty(activityInstanceId)){
+            String[] split = activityInstanceId.split(":");
+            currentActivityId = split[0];
         }
         List<String> assigneeList = new ArrayList<>();
         NodeJsonDataService nodeJsonDataService = SpringContextHolder.getBean(NodeJsonDataService.class);
         LambdaQueryWrapper<NodeJsonData> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.eq(NodeJsonData::getProcessDefinitionId,execution.getProcessDefinitionId());
         NodeJsonData nodeJsonData = nodeJsonDataService.getOne(lambdaQueryWrapper);
-        String currentActivityId=execution.getCurrentActivityId();
-        if(StringUtils.endsWith(execution.getCurrentActivityId(),MULTI_BODY)){
+        if(StringUtils.endsWith(currentActivityId,MULTI_BODY)){
             currentActivityId=currentActivityId.replace(MULTI_BODY,"");
         }
 
