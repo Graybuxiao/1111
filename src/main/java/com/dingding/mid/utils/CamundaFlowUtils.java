@@ -65,7 +65,7 @@ public class CamundaFlowUtils {
         Properties props = currentNode.getProps();
         String assignedType = props.getAssignedType();
         Map<String, Object> nobody = props.getNobody();
-        String variable=currentActivityId+"AssigneeList";
+        String variable=currentActivityId+MULTI_LIST;
         if(AssigneeTypeEnums.ASSIGN_USER.getTypeName().equals(assignedType)){
             List<UserInfo> assignedUser = props.getAssignedUser();
             for (UserInfo userInfo : assignedUser) {
@@ -149,7 +149,7 @@ public class CamundaFlowUtils {
         }
 
 
-        execution.setVariableLocal(currentActivityId+"AssigneeList",assigneeList);
+        execution.setVariableLocal(variable,assigneeList);
         return assigneeList;
     }
 
