@@ -78,7 +78,7 @@ public class    BpmnModelUtils {
 
                                     StringBuffer conditionExpression=new StringBuffer();
                                     conditionExpression.append("${ ");
-
+                                    //精髓代码实现4 拼装条件表达式, 我们使用JUEL METHOD 方法, 这种方式便于理解,flowable自身通过反射 Invoke 到 ExUtils类 执行对应方法, 有问题或者要新增逻辑  可以直接按照下方代码新增
                                     for (int i = 0; i < groups.size(); i++) {
                                         conditionExpression.append(" ( ");
                                         GroupsInfo group = groups.get(i);
@@ -232,7 +232,7 @@ public class    BpmnModelUtils {
         return endEvent;
     }
 
-
+    //精髓代码实现3 如何进行的JSON-BPMN完整逻辑组装
     public static String create(String fromId, ChildNode flowNode, Process process,BpmnModel bpmnModel,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) throws InvocationTargetException, IllegalAccessException {
         String nodeType = flowNode.getType();
         if (Type.CONCURRENTS.isEqual(nodeType)) {

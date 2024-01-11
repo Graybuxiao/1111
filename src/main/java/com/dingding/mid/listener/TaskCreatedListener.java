@@ -21,6 +21,7 @@ import static com.dingding.mid.utils.BpmnModelUtils.getChildNode;
 /**
  * @author LoveMyOrange
  * @create 2022-10-15 14:51
+ * @desc 精髓代码实现2 ,看下如何实现的审批人为空自动通过的逻辑
  */
 @Component
 public class TaskCreatedListener implements TaskListener {

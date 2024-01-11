@@ -35,6 +35,7 @@ import static com.dingding.mid.utils.BpmnModelUtils.getChildNode;
 /**
  * @author LoveMyOrange
  * @create 2022-10-15 13:35
+ * @desc 本项目精髓代码实现-> 所有属性都在内存中取得,且该类最重要的一点就是  下面有一个if判断,防止人员重复解析--->
  */
 @Component
 public class CounterSignListener implements ExecutionListener {
