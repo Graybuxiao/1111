@@ -1,6 +1,7 @@
 package com.dingding.mid.controller;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.map.MapUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
@@ -60,7 +61,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletRequest;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.InvalidKeyException;
@@ -99,6 +104,7 @@ public class WorkspaceProcessController {
     private UserService userService;
     @Resource
     private CcService ccService;
+
 
 
 
@@ -859,7 +865,22 @@ public class WorkspaceProcessController {
         String comments = handleDataDTO.getComments();
         JSONObject formData = handleDataDTO.getFormData();
         String taskId = handleDataDTO.getTaskId();
-        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        HistoricTaskInstance task = null;
+        if(null == taskId){
+            //通过流程实例id找最新的taskId
+            List<HistoricTaskInstance> list = historyService.createHistoricTaskInstanceQuery()
+                    .processInstanceId(handleDataDTO.getProcessInstanceId()).orderByTaskId().desc().list();
+            if(CollUtil.isNotEmpty(list)){
+                task = list.get(0);
+            }
+        }else {
+            task = historyService.createHistoricTaskInstanceQuery().taskId(taskId).singleResult();
+        }
+        if(null == task){
+            return Result.error("找不到任务");
+        }
+
+
         Map<String,Object> map=new HashMap<>();
         if(formData!=null &&formData.size()>0){
             Map formValue = JSONObject.parseObject(formData.toJSONString(), new TypeReference<Map>() {
@@ -868,18 +889,23 @@ public class WorkspaceProcessController {
             map.put(FORM_VAR,formData);
         }
 //        map.put(PROCESS_STATUS,BUSINESS_STATUS_1);
-        runtimeService.setVariables(task.getProcessInstanceId(),map);
-        if(StringUtils.isNotBlank(comments)){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),COMMENTS_COMMENT,comments);
-        }
-        if(attachments!=null && attachments.size()>0){
-            for (AttachmentDTO attachment : attachments) {
-                taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+        HistoricProcessInstance historicProcessInstance = historyService.createHistoricProcessInstanceQuery().processInstanceId(handleDataDTO.getProcessInstanceId()).singleResult();
+        if(historicProcessInstance.getEndTime()==null){
+            runtimeService.setVariables(task.getProcessInstanceId(),map);
+            if(StringUtils.isNotBlank(comments)){
+                taskService.addComment(task.getId(),task.getProcessInstanceId(),COMMENTS_COMMENT,comments);
             }
-        }
+            if(attachments!=null && attachments.size()>0){
+                for (AttachmentDTO attachment : attachments) {
+                    taskService.createAttachment(OPTION_COMMENT,taskId,task.getProcessInstanceId(),attachment.getName(),attachment.getName(),attachment.getUrl());
+                }
+            }
 
-        if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
-            taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            if(StringUtils.isNotBlank(handleDataDTO.getSignInfo())){
+                taskService.addComment(task.getId(),task.getProcessInstanceId(),SIGN_COMMENT,handleDataDTO.getSignInfo());
+            }
+        }else{
+
         }
         return Result.OK();
     }
