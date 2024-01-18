@@ -1,17 +1,9 @@
-# dingding-mid     中国式传统流程引擎开源标杆(Activiti 567 Flowable 56,Camunda7 )
-
-### 大家可扫码加入交流群， 如果二维码失效了，可以加我微信 Doctor4JavaEE  备注 钉钉 拉你入群
-<table>
-  <tr>
-    <td><img src="https://pro.cxygzl.com/wj//2023-09-18/36a3f20a346646cc87b32abc3c44d63d-918.jpg" alt="微信群" style="zoom:20%;" /></td>
-    <td><img src="https://jeecgdev.oss-cn-beijing.aliyuncs.com/upload/%E5%BE%AE%E4%BF%A1_1665560718233.png" alt="作者微信" style="zoom:20%;" /></td>
-  </tr>
-</table> 
-
-### 史上最全工作流社区文档 http://123.249.74.161:1024/
-### 演示地址: http://123.249.74.161/ 
 
 
+## 本分支使用了wflow以及flowlong完成,flowlong使用细则请务必遵循下方2点
+
+http://123.249.74.161:1024/blogs/gitee_flowlong/00_description.html    
+https://gitee.com/aizuda/flowlong/issues/I7XGP5  
 
 
 
