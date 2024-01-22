@@ -105,9 +105,9 @@ public class CounterSignListener implements ExecutionListener {
                 Integer level = MapUtil.getInt(leaderTop, "level");
                 UserService userService = SpringContextHolder.getBean(UserService.class);
                 String startUserJson = execution.getVariable(START_USER_INFO, String.class);
-                List<UserInfo> userInfos = JSONObject.parseObject(startUserJson, new TypeReference<List<UserInfo>>() {
+                UserInfo userInfo = JSONObject.parseObject(startUserJson, new TypeReference<UserInfo>() {
                 });
-                UserInfo userInfo = userInfos.get(0);
+
                 String id = userInfo.getId();
                 Users users = userService.getById(id);
                 //todo 因为此项目没有级联结构,自行递归获取1~10级某一级,不会有人这都不会吧,嘤嘤嘤
