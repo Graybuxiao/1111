@@ -1006,8 +1006,8 @@ public class    BpmnModelUtils {
                             boundaryEvent.addEventDefinition(timerEventDefinition);
                             FlowableListener flowableListener = new FlowableListener();
                             flowableListener.setEvent(ExecutionListener.EVENTNAME_END);
-                            flowableListener.setImplementationType(IMPLEMENTATION_TYPE_CLASS);
-                            flowableListener.setImplementation("com.dingding.mid.listener.TimerListener");
+                            flowableListener.setImplementationType(IMPLEMENTATION_TYPE_DELEGATEEXPRESSION);
+                            flowableListener.setImplementation("${timerListener}");
                             List<FlowableListener> listenerList= new ArrayList<>();
                             listenerList.add(flowableListener);
                             boundaryEvent.setExecutionListeners(listenerList);
