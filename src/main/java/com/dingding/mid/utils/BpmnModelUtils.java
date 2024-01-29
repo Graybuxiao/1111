@@ -950,6 +950,7 @@ public class    BpmnModelUtils {
             taskListeners.add(taskListener);
             userTask.setTaskListeners(taskListeners);
             if("root".equalsIgnoreCase(id)){
+                userTask.setAssignee("${initiatorId}");
             }
             else{
                 ArrayList<FlowableListener> listeners = new ArrayList<>();

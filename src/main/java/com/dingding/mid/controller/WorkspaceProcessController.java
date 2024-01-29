@@ -139,6 +139,7 @@ public class WorkspaceProcessController {
             processVariables.put(FORM_VAR,formData);
             processVariables.put(PROCESS_STATUS,BUSINESS_STATUS_1);
             processVariables.put(START_USER_INFO,JSONObject.toJSONString(startUserInfo));
+            processVariables.put(INITIATOR_ID,startUserInfo.getId());
             ArrayList<UserInfo> userInfos = CollUtil.newArrayList(startUserInfo);
             processVariables.put("root",JSONObject.toJSONString(userInfos));
             Map<String, List<UserInfo>> processUsers = startProcessInstanceDTO.getProcessUsers();
