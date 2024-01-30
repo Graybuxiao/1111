@@ -23,6 +23,8 @@ import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.util.*;
 
+import static com.dingding.mid.common.CommonConstants.START_USER_INFO;
+
 /**
  * @author LoveMyOrange
  * @create 2022-10-16 22:13
@@ -304,10 +306,13 @@ public class ExUtils {
         RepositoryService repositoryService = SpringContextHolder.getBean(RepositoryService.class);
         ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery().processDefinitionId(execution.getProcessDefinitionId()).singleResult();
         finalVariables.put("formName",processDefinition.getName());
-        finalVariables.put("ownerId","10000");
-        finalVariables.put("ownerName","旅人");
-        finalVariables.put("ownerDeptId","9999");
-        finalVariables.put("ownerDeptName","研发部");
+        Map<String, Object> processVariables = execution.getVariables();
+        UserInfo userInfo = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
+        });
+        finalVariables.put("ownerId",userInfo.getId());
+        finalVariables.put("ownerName",userInfo.getName());
+        finalVariables.put("ownerDeptId","部门id请自己维护在各自的User对象中");
+        finalVariables.put("ownerDeptName","部门Name请自己维护在各自的User对象中");
         finalVariables.put("instanceId",execution.getProcessInstanceId());
 
 
@@ -336,7 +341,34 @@ public class ExUtils {
                 bodyMap.put(name,s);
             }
             else{
-                bodyMap.put(name,value);
+                Map<String, Object> processVariables = execution.getVariables();
+                UserInfo userInfo = JSONObject.parseObject(MapUtil.getStr(processVariables, START_USER_INFO), new TypeReference<UserInfo>() {
+                });
+                //进行特殊条件判断
+                RepositoryService repositoryService = SpringContextHolder.getBean(RepositoryService.class);
+                ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery().processDefinitionId(execution.getProcessDefinitionId()).singleResult();
+                if("formName".equals(value)){
+                    bodyMap.put(name,processDefinition.getName());
+                }
+                else if ("ownerId".equals(value)) {
+                    bodyMap.put(name,userInfo.getId());
+                }
+                else if ("ownerName".equals(value)) {
+                    bodyMap.put(name,userInfo.getName());
+                }
+                else if ("ownerDeptId".equals(value)) {
+                    bodyMap.put(name,"部门id请自己维护在各自的User对象中");
+                }
+                else if ("ownerDeptName".equals(value)) {
+                    bodyMap.put(name,"部门name请自己维护在各自的User对象中");
+                }
+                else if ("instanceId".equals(value)) {
+                    bodyMap.put(name,execution.getProcessInstanceId());
+                }
+                else{
+                    bodyMap.put(name,value);
+                }
+
             }
         }
 

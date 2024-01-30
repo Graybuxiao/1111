@@ -99,8 +99,6 @@
 import FormRender from "@/views/common/form/FormRender";
 import { getFormDetailV2 } from "@/api/design";
 import OrgPicker from "@/components/common/OrgPicker";
-import {flatFormItem} from "@/views/workspace/form";
-
 export default {
   name: "SponsorProcess",
   components: { FormRender, OrgPicker },
@@ -171,27 +169,9 @@ export default {
           let form = rsp.data.result;
           form.logo = JSON.parse(form.logo);
           form.settings = JSON.parse(form.settings);
+          form.formItems = JSON.parse(form.formItems);
           form.process = JSON.parse(form.process);
-          const perms = form.process.props.formPerms || [];
-          // 表单项 从json转换为数组 用于渲染表单 扁平化处理 去除了spanLayout
-          const formItems = flatFormItem(JSON.parse(form.formItems));
-          // item显示状态映射关系
-          const itemStatusMap = new Map(perms.map((it) => [it.id, it.perm]));
-          const items = formItems
-              .map((item) => {
-                // perm说明 只读R  编辑E  隐藏H
-                const perm = itemStatusMap.get(item.id);
-                if (perm === "E") {
-                  return item;
-                } else if (perm === "R") {
-                  item.props.readerMode = true;
-                  return item;
-                } else if (perm === "H") {
-                  return undefined;
-                }
-              })
-              .filter(Boolean);
-          form.formItems = items;
+
 
           this.form = form;
           //构建表单及校验规则
