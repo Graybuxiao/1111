@@ -619,7 +619,7 @@ public class WorkspaceProcessController {
         //TODO 不实现复杂退回模式,他没写我也不写
         else if(RefuseEnums.TO_NODE.getTypeName().equals(type)){
             String target = MapUtil.getStr(refuse, "target");
-            runtimeService.createChangeActivityStateBuilder().moveActivityIdTo(task.getTaskDefinitionKey(),target).changeState();
+            runtimeService.createChangeActivityStateBuilder().processInstanceId(task.getProcessInstanceId()).moveActivityIdTo(task.getTaskDefinitionKey(),target).changeState();
         }
 
         return Result.OK();
