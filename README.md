@@ -30,13 +30,13 @@
 
 
 
-| 史上最全工作流文档  | http://123.249.74.161:1024/                           |
+| 史上最全工作流文档  | https://www.yuque.com/qisini-id3fm/tcgpvh                           |
 |------------|-------------------------------------------------------|
-| 演示地址:      | http://123.249.74.161/                                |
-| Vue3 演示地址: | http://123.249.74.161:5200/                           |
-| Vue3 get方式 | http://123.249.74.161:1024/blogs/jianhua/00_demo.html |
-| 超高TPS-QPS性能工作流 | http://123.249.74.161:1024/blogs/enterprise_jituan/00_tps-qps.html |
-| 单台普通PC服务器日支撑千万级业务流 | http://123.249.74.161:1024/blogs/enterprise_jituan/00_tps-qps.html |
+| 演示地址:      | 暂无                                |
+| Vue3 演示地址: | 暂无                           |
+| Vue3 get方式 | https://www.yuque.com/qisini-id3fm/tcgpvh/tbefqhz4znxql02o |
+| 超高TPS-QPS性能工作流 | https://www.yuque.com/qisini-id3fm/tcgpvh/opta08y7sbbkfgaq |
+| 单台普通PC服务器日支撑千万级业务流 | https://www.yuque.com/qisini-id3fm/tcgpvh/opta08y7sbbkfgaq |
 
 
 
