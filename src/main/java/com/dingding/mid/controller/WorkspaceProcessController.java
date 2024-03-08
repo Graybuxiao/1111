@@ -1053,11 +1053,22 @@ public class WorkspaceProcessController {
         HistoricProcessInstance historicProcessInstance = historyService.createHistoricProcessInstanceQuery().processInstanceId(processInstanceId)
                 .includeProcessVariables().singleResult();
         String processDefinitionKey = historicProcessInstance.getProcessDefinitionKey();
+
+        String ex = repositoryService.getBpmnModel(historicProcessInstance.getProcessDefinitionId()).getMainProcess().getAttributeValue("http://flowable.org/bpmn", "DingDing");
+        HashMap hashMap = JSONObject.parseObject(ex, new TypeReference<HashMap>() {
+        });
+        String processJson = MapUtil.getStr(hashMap, "processJson");
+        String formJson = MapUtil.getStr(hashMap, "formJson");
+
+
+
         ProcessTemplates processTemplates = processTemplateService.getById(processDefinitionKey.replace(PROCESS_PREFIX,""));
         processTemplates.setLogo(processTemplates.getIcon());
         processTemplates.setFormId(processTemplates.getTemplateId());
         processTemplates.setFormName(processTemplates.getTemplateName());
         processTemplates.setProcessDefinitionId(historicProcessInstance.getProcessDefinitionId());
+        processTemplates.setProcess(processJson);
+        processTemplates.setFormItems(formJson);
 
         HandleDataVO handleDataVO =new HandleDataVO();
         Map<String, Object> processVariables = historicProcessInstance.getProcessVariables();
