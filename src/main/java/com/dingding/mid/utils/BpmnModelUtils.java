@@ -360,8 +360,12 @@ public class    BpmnModelUtils {
             if("FIXED".equals(type)){
                 Long time = props.getTime();
                 String unit = props.getUnit();
-
-                timerEventDefinition.setTimeDuration("PT"+time+unit);
+                if("D".equals(unit)){
+                    timerEventDefinition.setTimeDuration("P"+time+unit);
+                }
+                else{
+                    timerEventDefinition.setTimeDuration("PT"+time+unit);
+                }
                 timerEventDefinition.setId(id("timerEventDefinition"));
                 intermediateCatchEvent.addEventDefinition(timerEventDefinition);
             }
