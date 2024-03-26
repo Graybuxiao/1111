@@ -436,11 +436,7 @@ public class    BpmnModelUtils {
             }
             else{
                 String dateTime = props.getDateTime();
-                Date date= new Date();
-                String format = DateUtil.format(date, "yyyy-MM-dd HH:mm:ss");
-                String[] split = format.split("-");
-                dateTime=split[0]+"-"+split[1]+"-"+split[2]+" "+dateTime;
-                timerEventDefinition.setTimeDate(dateTime);
+                timerEventDefinition.setTimeDate("${"+EXPRESSION_CLASS+"timeDate(execution)}");
                 intermediateCatchEvent.addEventDefinition(timerEventDefinition);
             }
         }

@@ -2,14 +2,18 @@ package com.dingding.mid.utils;
 
 import cn.hutool.core.codec.Base64;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.NumberUtil;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.TypeReference;
+import com.dingding.mid.dto.json.ChildNode;
+import com.dingding.mid.dto.json.Properties;
 import com.dingding.mid.dto.json.UserInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.flowable.bpmn.model.Process;
 import org.flowable.common.engine.impl.de.odysseus.el.ExpressionFactoryImpl;
 import org.flowable.common.engine.impl.de.odysseus.el.util.SimpleContext;
 import org.flowable.common.engine.impl.javax.el.ExpressionFactory;
@@ -21,9 +25,13 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static com.dingding.mid.common.CommonConstants.START_USER_INFO;
+import static com.dingding.mid.common.WorkFlowConstants.*;
+import static com.dingding.mid.utils.BpmnModelUtils.getChildNode;
 
 /**
  * @author LoveMyOrange
@@ -374,6 +382,38 @@ public class ExUtils {
 
         return JSONObject.toJSONString(bodyMap);
     }
+
+    /**
+     *
+     * @param execution
+     * @return
+     */
+    public String timeDate(DelegateExecution execution){
+        ChildNode childNode = getNode(execution);
+        ChildNode node = getChildNode(childNode, execution.getCurrentActivityId());
+        Properties props = node.getProps();
+        String dateTime = props.getDateTime();
+        String[] split1 = dateTime.split(":");
+        //
+        Date date=new Date();
+        date.setHours(Integer.valueOf(split1[0]));
+        date.setMinutes(Integer.valueOf(split1[1]));
+        date.setSeconds(Integer.valueOf(split1[2]));
+        String format = DateUtil.format(date, "yyyy-MM-dd'T'HH:mm:ssXXX");
+        return format;
+    }
+
+    private ChildNode getNode(DelegateExecution execution) {
+        RepositoryService repositoryService = SpringContextHolder.getBean(RepositoryService.class);
+        Process mainProcess = repositoryService.getBpmnModel(execution.getProcessDefinitionId()).getMainProcess();
+        String dingDing = mainProcess.getAttributeValue(FLOWABLE_NAME_SPACE, FLOWABLE_NAME_SPACE_NAME);
+        JSONObject jsonObject = JSONObject.parseObject(dingDing, new TypeReference<JSONObject>() {
+        });
+        String processJson = jsonObject.getString(VIEW_PROCESS_JSON_NAME);
+        ChildNode childNode = JSONObject.parseObject(processJson, new TypeReference<ChildNode>(){});
+        return childNode;
+    }
+
     public String requestHeaders(DelegateExecution execution,String headerStr){
         byte[] decode = Base64.decode(headerStr.getBytes(Charset.defaultCharset()));
         headerStr=new String(decode);
