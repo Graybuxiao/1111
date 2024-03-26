@@ -302,7 +302,10 @@ public class    BpmnModelUtils {
             childNodeMap.put(flowNode.getId(),flowNode);
             JSONObject incoming = flowNode.getIncoming();
             incoming.put("incoming", Collections.singletonList(fromId));
-            String id = createTriggerTask(process,flowNode,sequenceFlows,childNodeMap);
+            //旧版使用 HttpTask实现 ,诸多不灵活, 我们使用servcieeeTask实现 ,
+            // 保留以前旧版代码,供大家学习茴香豆的茴有几种写法. 我就是天才 哈哈哈
+//            String id = createTriggerTask(process,flowNode,sequenceFlows,childNodeMap);
+            String id=createNewTriggerTask(process,flowNode,sequenceFlows,childNodeMap);
             // 如果当前任务还有后续任务，则遍历创建后续任务
             ChildNode children = flowNode.getChildren();
             if (Objects.nonNull(children) &&StringUtils.isNotBlank(children.getId())) {
@@ -340,6 +343,67 @@ public class    BpmnModelUtils {
         else{
             throw new WorkFlowException("哪有？？");
         }
+    }
+
+    private static String createNewTriggerTask(Process process, ChildNode flowNode, List<SequenceFlow> sequenceFlows, Map<String, ChildNode> childNodeMap) {
+        JSONObject incomingJson = flowNode.getIncoming();
+        List<String> incoming = incomingJson.getJSONArray("incoming").toJavaList(String.class);
+        // 自动生成id
+//        String id = id("serviceTask");
+        String id=flowNode.getId();
+        if (incoming != null && !incoming.isEmpty()) {
+            Properties props = flowNode.getProps();
+            String type = props.getType();
+            if("WEBHOOK".equals(type)){
+                ServiceTask serviceTask = new ServiceTask();
+                serviceTask.setName(flowNode.getName());
+                serviceTask.setId(id);
+                serviceTask.setImplementationType(IMPLEMENTATION_TYPE_DELEGATEEXPRESSION);
+                serviceTask.setImplementation("${triggerTaskExListener}");
+                process.addFlowElement(serviceTask);
+                process.addFlowElement(connect(incoming.get(0), id,sequenceFlows,childNodeMap,process));
+            }
+            //邮件节点的逻辑,不需要变
+            else{
+                EmailInfo email = props.getEmail();
+                ServiceTask serviceTask=new ServiceTask();
+                serviceTask.setType("mail");
+                List<FieldExtension> fieldExtensions= new ArrayList<>();
+
+                FieldExtension emailFrom= new FieldExtension();
+                emailFrom.setFieldName("from");
+                emailFrom.setStringValue("2471089198@qq.com");
+                fieldExtensions.add(emailFrom);
+
+                FieldExtension emailTo= new FieldExtension();
+                emailTo.setFieldName("to");
+                emailTo.setStringValue(StrUtil.join(",",email.getTo()));
+                fieldExtensions.add(emailTo);
+
+                FieldExtension emailSubject= new FieldExtension();
+                emailSubject.setFieldName("subject");
+                emailSubject.setStringValue(email.getSubject());
+                fieldExtensions.add(emailSubject);
+
+                FieldExtension emailContent= new FieldExtension();
+                emailContent.setFieldName("text");
+                String content = email.getContent();
+                try {
+                    content = Base64.encode(content.getBytes("UTF-8"));
+                } catch (UnsupportedEncodingException e) {
+                    throw new RuntimeException(e);
+                }
+                emailContent.setExpression("${"+EXPRESSION_CLASS+ "mailContent(execution,"+"'"+content+"'"+")"+"}");
+                fieldExtensions.add(emailContent);
+                serviceTask.setName(flowNode.getName());
+                serviceTask.setId(id);
+                serviceTask.setFieldExtensions(fieldExtensions);
+                process.addFlowElement(serviceTask);
+                process.addFlowElement(connect(incoming.get(0), id,sequenceFlows,childNodeMap,process));
+            }
+
+        }
+        return id;
     }
 
     private static String createDelayTask(Process process,ChildNode flowNode,List<SequenceFlow> sequenceFlows,Map<String,ChildNode> childNodeMap) {
