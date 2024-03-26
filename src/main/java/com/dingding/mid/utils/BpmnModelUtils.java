@@ -23,6 +23,7 @@ import org.flowable.engine.RepositoryService;
 import org.flowable.engine.TaskService;
 import org.flowable.engine.delegate.ExecutionListener;
 import org.flowable.engine.delegate.TaskListener;
+import org.flowable.engine.repository.ProcessDefinition;
 import org.flowable.spring.integration.Flowable;
 import org.springframework.util.CollectionUtils;
 
@@ -1122,7 +1123,18 @@ public class    BpmnModelUtils {
             callActivity.setName(flowNode.getName());
             callActivity.setId(id);
             callActivity.setCalledElementType("key");
-            callActivity.setCalledElement("");
+            String subprocessId = props.getSubprocessId();
+            String[] split = subprocessId.replace("[", "").replace("]", "").replace("\"","").split(",");
+            String categoryId=split[0];
+            String templateId=split[1];
+            RepositoryService repositoryService = SpringContextHolder.getBean(RepositoryService.class);
+            ProcessDefinition processDefinition = repositoryService.createProcessDefinitionQuery().processDefinitionKey(PROCESS_PREFIX + templateId).latestVersion().singleResult();
+            if(processDefinition==null){
+                throw  new WorkFlowException("该流程暂未接入Flowable,请重试");
+            }
+            callActivity.setInheritVariables(true);
+            callActivity.setCalledElement(processDefinition.getKey());
+            callActivity.setFallbackToDefaultTenant(true);
             process.addFlowElement(callActivity);
             process.addFlowElement(connect(incoming.get(0), id,sequenceFlows,childNodeMap,process));
             List<UserInfo> assignedUser = props.getAssignedUser();

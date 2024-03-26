@@ -21,10 +21,11 @@ import lombok.Data;
 "leaderTop\":{\"endCondition\":\"TOP\",\"endLevel\":1},\
 "leader\":{\"level\":1},\"role\":[],\
 "refuse\":{\"type\":\"TO_END\",\"target\":\"\"},\"formUser\":\"\"},\"type\":\"APPROVAL\",\"name\":\"审批人\",\"children\":{}}}"
- 
+
  */
 @Data
 public class Properties {
+  private String subprocessId;
   private String assignedType;
   private List<UserInfo> assignedUser;
   //发起人自旋  multiple true false
@@ -42,21 +43,21 @@ public class Properties {
   //审批人为空的规则  hander 和 assignedUser
   private Map<String,Object> nobody;
   private String mode;
-  
+
   private Boolean sign;
   //审批超时
   private JSONObject timeLimit;
 
   private Map<String,Object> refuse;
-  
+
   private List<FormOperates> formPerms;
-  
-  
+
+
   //------------------------------------->
   private String groupsType;
   private String expression;
   private List<GroupsInfo> groups;
-  
+
   //
   private Boolean shouldAdd;
   //
@@ -64,7 +65,7 @@ public class Properties {
   private Long time;
   private String unit;
   private String dateTime;
-  
+
   //
   private HttpInfo http;
   private EmailInfo email;
