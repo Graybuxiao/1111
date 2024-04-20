@@ -594,6 +594,8 @@ public class WorkspaceProcessController {
         }
         map.put(PROCESS_STATUS,BUSINESS_STATUS_3);
         runtimeService.setVariables(task.getProcessInstanceId(),map);
+        runtimeService.updateBusinessStatus(execution.getProcessInstanceId(), BUSINESS_STATUS_3);
+
         if(StringUtils.isNotBlank(comments)){
             taskService.addComment(task.getId(),task.getProcessInstanceId(),OPINION_COMMENT,comments);
         }
@@ -657,6 +659,7 @@ public class WorkspaceProcessController {
         }
         map.put(PROCESS_STATUS,BUSINESS_STATUS_2);
         runtimeService.setVariables(task.getProcessInstanceId(),map);
+        runtimeService.updateBusinessStatus(execution.getProcessInstanceId(), BUSINESS_STATUS_2);
         if(StringUtils.isNotBlank(comments)){
             taskService.addComment(task.getId(),task.getProcessInstanceId(),"opinion",comments);
         }

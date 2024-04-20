@@ -17,8 +17,13 @@ import org.springframework.stereotype.Component;
 public class ProcessListener implements ExecutionListener {
     @Resource
     private RepositoryService repositoryService;
+    
+    @Resource
+    private RuntimeService runtimeService;
+
     @Override
     public void notify(DelegateExecution execution) {
         execution.setVariable(PROCESS_STATUS,BUSINESS_STATUS_4);
+        runtimeService.updateBusinessStatus(execution.getProcessInstanceId(), BUSINESS_STATUS_4);
     }
 }
