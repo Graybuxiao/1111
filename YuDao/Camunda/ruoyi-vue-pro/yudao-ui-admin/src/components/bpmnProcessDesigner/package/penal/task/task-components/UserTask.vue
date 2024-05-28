@@ -1,6 +1,6 @@
 <template>
   <div style="margin-top: 16px">
-    <el-form-item label="处理用户" v-show="false">
+    <el-form-item label="处理用户" >
       <el-input v-model="userTaskForm.assignee" @change="updateElementTask('assignee')"/>
     </el-form-item>
 <!--    <el-form-item label="候选用户">-->
@@ -36,9 +36,7 @@ export default {
     type: String
   },
 
-  created() {
-    this.updateElementTask('assignee')
-  },
+
 
   data() {
     return {
@@ -50,9 +48,7 @@ export default {
         followUpDate: "",
         priority: ""
       },
-      userTaskForm: {
-        assignee: "${assignee}"
-      },
+      userTaskForm: {},
       mockData: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     };
   },
