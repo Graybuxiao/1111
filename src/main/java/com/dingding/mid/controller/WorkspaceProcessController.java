@@ -960,17 +960,21 @@ public class WorkspaceProcessController {
                             taskDetailVO.setComment(comment.getFullMessage());
                             List<Attachment> attachments = attachmentMap.get(historicActivityInstance.getTaskId());
                             List<AttachmentVO> attachmentVOList = new ArrayList<>();
-                            for (Attachment attachment : attachments) {
-                                AttachmentVO attachmentVO = new AttachmentVO();
-                                attachmentVO.setId(attachment.getId());
-                                attachmentVO.setName(attachment.getName());
-                                attachmentVO.setUrl(attachment.getUrl());
-                                attachmentVOList.add(attachmentVO);
+                            if(CollUtil.isNotEmpty(attachments)){
+                                for (Attachment attachment : attachments) {
+                                    AttachmentVO attachmentVO = new AttachmentVO();
+                                    attachmentVO.setId(attachment.getId());
+                                    attachmentVO.setName(attachment.getName());
+                                    attachmentVO.setUrl(attachment.getUrl());
+                                    attachmentVOList.add(attachmentVO);
+                                }
                             }
 
-                            for (Comment comment1 : comments) {
-                                if(SIGN_COMMENT.equals(comment1.getType())){
-                                    taskDetailVO.setSignImage(comment1.getFullMessage());
+                            if(CollUtil.isNotEmpty(comments)){
+                                for (Comment comment1 : comments) {
+                                    if(SIGN_COMMENT.equals(comment1.getType())){
+                                        taskDetailVO.setSignImage(comment1.getFullMessage());
+                                    }
                                 }
                             }
 
