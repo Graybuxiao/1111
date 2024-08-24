@@ -1,15 +1,13 @@
+# 本人在B站有录制各种工作流实操视频,大家请多多支持!
 
-# Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要: 
-# https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0    正在更新中
-# Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要: 
-# https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0   正在更新中
-# Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要: 
-# https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0   正在更新中
-
-
-
-
-
+| 课程名  |课程链接   | 完结状态  |
+|---|---|---|
+| Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要:   | https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0  | 正在更新中  |
+| Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要:   | https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0  | 正在更新中  |
+| Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要:   | https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0  | 正在更新中  |
+| Flowable中国式流程课程B站全网首发 讲解Flowable项目实施中的重难点,如有需要:   | 正在录制中  | 正在更新中  |
+| Activiti中国式流程课程B站全网首发 讲解Activiti项目实施中的重难点,如有需要:   | 正在录制中  | 正在更新中  |
+| 一种支持超高TPS的流程引擎性能架构以及流程引擎调优   | 正在录制中  | 正在更新中  |
 
 
 
