@@ -1,3 +1,8 @@
+
+# Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要: https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0   正在更新中
+# Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要: https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0   正在更新中
+# Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要: https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0   正在更新中
+
 # dingding-mid     中国式传统流程引擎开源标杆(Activiti 567 Flowable 56,Camunda7 )
 
 
