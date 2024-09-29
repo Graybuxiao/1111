@@ -1,8 +1,9 @@
+# 新官网地址:  http://101.42.224.59:35003/
+
 # 本人在B站有录制各种工作流实操视频,大家请多多支持!
 
 | 课程名  |课程链接   | 完结状态  |
 |---|---|---|
-| Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要:   | https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0  | 正在更新中  |
 | Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要:   | https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0  | 正在更新中  |
 | Camunda中国式流程课程B站全网首发 讲解Camunda项目实施中的重难点,如有需要:   | https://www.bilibili.com/cheese/play/ss30347?csource=private_space_class_null&spm_id_from=333.999.0.0  | 正在更新中  |
 | Flowable中国式流程课程B站全网首发 讲解Flowable项目实施中的重难点,如有需要:   | 正在录制中  | 正在更新中  |
@@ -73,13 +74,13 @@
 
 
 
-| 史上最全工作流文档  | https://www.yuque.com/qisini-id3fm/tcgpvh                           |
+| 史上最全工作流文档  | http://101.42.224.59:35003/                           |
 |------------|-------------------------------------------------------|
 | 演示地址:      | 暂无                                |
 | Vue3 演示地址: | 暂无                           |
-| Vue3 get方式 | https://www.yuque.com/qisini-id3fm/tcgpvh/tbefqhz4znxql02o |
-| 超高TPS-QPS性能工作流 | https://www.yuque.com/qisini-id3fm/tcgpvh/opta08y7sbbkfgaq |
-| 单台普通PC服务器日支撑千万级业务流 | https://www.yuque.com/qisini-id3fm/tcgpvh/opta08y7sbbkfgaq |
+| Vue3 get方式 | 暂无 |
+| 超高TPS-QPS性能工作流 | http://101.42.224.59:35003/blogs/tps/00_tps-qps.html |
+| 单台普通PC服务器日支撑千万级业务流 | http://101.42.224.59:35003/blogs/tps/00_tps-qps.html |
 
 
 
@@ -98,14 +99,7 @@
 > - 5>任何个人需要集成本项目并以此来售卖,请粘贴本项目LINCENSE_补充协议到各自项目中,或者gitee issue写公司名字既可
 > - 6>任何国家机关以及公益机构以及学校对本项目可以无限制使用,本人愿意无偿提供其集成以及探讨问题,算是为国家出一份自己微薄的力量   
 
-### 当然,如果做工作流的,当然都知道,后端才是本项目的重点,特别是json转bpmn的那里 ,有些缺德的公司/个人/友商/间谍狗倒是有可能单单直接把后台借鉴进去,
-### 这样就不受GPL3.0协议的限制了,首先我想说的是,这块才是本项目的核心代码,
-### 对于这个,我只能说是道德问题,我无法要求你们, 只能说有点不要脸,但这样做的话,属于说使得国内开源环境越来越坏,这样越来越没有人愿意开源了, 
-### 纯纯属于是 污染国内开源环境了,.我希望大家不要做这样的人/公司!!!
 
-| 相关抄袭狗    | https://gitee.com/junyue/cxygzl?_from=gitee_search |
-|----------|----------------------------------------------------|
-| 具体抄袭详情请看 | http://123.249.74.161:1024/blogs/copy/00_demo.html |
 
 
 
